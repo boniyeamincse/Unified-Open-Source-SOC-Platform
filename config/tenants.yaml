@@ -1,0 +1,163 @@
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : config/tenants.yaml
+#  Purpose: Multi-tenant configuration for org-based data isolation.
+#           Defines tenants, their Keycloak groups, TheHive orgs,
+#           MISP sharing groups, and network segments.
+####################################################################
+
+# ── Global Settings ──────────────────────────────────────
+global:
+  default_tenant: "default"
+  enforce_isolation: true
+  cross_tenant_sharing: false
+  audit_cross_tenant_access: true
+
+# ── Tenant Definitions ───────────────────────────────────
+tenants:
+
+  # Default tenant (primary SOC team)
+  - id: "default"
+    name: "Primary SOC"
+    description: "Main Security Operations Center"
+    status: "active"
+    created: "2024-01-01"
+
+    # Keycloak integration
+    keycloak:
+      realm: "soc-platform"
+      group: "/tenants/primary-soc"
+      allowed_roles:
+        - "soc-admin"
+        - "soc-lead"
+        - "soc-analyst"
+        - "threat-hunter"
+        - "soc-readonly"
+
+    # TheHive organization
+    thehive:
+      organisation: "primary-soc"
+      case_prefix: "SOC"
+      default_severity: 2
+      sla_critical_minutes: 30
+      sla_high_minutes: 120
+      sla_medium_minutes: 480
+      sla_low_minutes: 1440
+
+    # MISP sharing group
+    misp:
+      sharing_group: "primary-soc-sg"
+      distribution: 1  # This community only
+      tag_prefix: "tenant:primary"
+
+    # Data isolation
+    data:
+      opensearch_index_prefix: "tenant-default-"
+      log_retention_days: 90
+      archive_retention_days: 365
+
+    # Network access
+    network:
+      allowed_segments:
+        - "net-mgmt"
+        - "net-app"
+        - "net-data"
+      source_subnets:
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+
+  # Example: MSSP client tenant
+  - id: "client-alpha"
+    name: "Client Alpha"
+    description: "Managed SOC client — Alpha Corp"
+    status: "active"
+    created: "2024-03-01"
+
+    keycloak:
+      realm: "soc-platform"
+      group: "/tenants/client-alpha"
+      allowed_roles:
+        - "soc-analyst"
+        - "soc-readonly"
+
+    thehive:
+      organisation: "client-alpha"
+      case_prefix: "ALPHA"
+      default_severity: 2
+      sla_critical_minutes: 15
+      sla_high_minutes: 60
+      sla_medium_minutes: 240
+      sla_low_minutes: 720
+
+    misp:
+      sharing_group: "client-alpha-sg"
+      distribution: 0  # Organisation only
+      tag_prefix: "tenant:alpha"
+
+    data:
+      opensearch_index_prefix: "tenant-alpha-"
+      log_retention_days: 180
+      archive_retention_days: 730
+
+    network:
+      allowed_segments:
+        - "net-app"
+      source_subnets:
+        - "10.100.0.0/16"
+
+  # Example: Internal IT team tenant
+  - id: "internal-it"
+    name: "Internal IT"
+    description: "Internal IT operations team"
+    status: "active"
+    created: "2024-03-01"
+
+    keycloak:
+      realm: "soc-platform"
+      group: "/tenants/internal-it"
+      allowed_roles:
+        - "soc-readonly"
+
+    thehive:
+      organisation: "internal-it"
+      case_prefix: "IT"
+      default_severity: 1
+      sla_critical_minutes: 60
+      sla_high_minutes: 240
+      sla_medium_minutes: 1440
+      sla_low_minutes: 4320
+
+    misp:
+      sharing_group: "internal-it-sg"
+      distribution: 0
+      tag_prefix: "tenant:internal"
+
+    data:
+      opensearch_index_prefix: "tenant-intit-"
+      log_retention_days: 30
+      archive_retention_days: 90
+
+    network:
+      allowed_segments:
+        - "net-app"
+      source_subnets:
+        - "192.168.0.0/16"
+
+# ── Isolation Rules ──────────────────────────────────────
+isolation:
+  # Each tenant's data is isolated by index prefix
+  opensearch:
+    enforce_prefix: true
+    cross_tenant_query: false
+
+  # TheHive org-level isolation
+  thehive:
+    enforce_org: true
+    shared_taxonomies: true   # Share case templates across tenants
+
+  # MISP sharing group isolation
+  misp:
+    enforce_sharing_group: true
+    global_feeds_visible: true  # All tenants see global threat feeds

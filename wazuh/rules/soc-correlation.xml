@@ -1,0 +1,303 @@
+<!-- ==================================================================
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : wazuh/rules/soc-correlation.xml
+  Purpose: Custom multi-stage correlation rules for advanced threat
+           detection. Chains events across time windows to identify
+           attack sequences (brute force → lateral movement, etc.)
+================================================================== -->
+
+<group name="soc-correlation,">
+
+  <!-- ============================================================ -->
+  <!-- BRUTE FORCE DETECTION                                        -->
+  <!-- ============================================================ -->
+
+  <!-- SSH Brute Force — 5 failed logins in 120 seconds -->
+  <rule id="100001" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>5710</if_matched_sid>
+    <description>SOC: SSH Brute Force Attack — $(srcip) — 5+ failed logins in 2 minutes</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,</group>
+  </rule>
+
+  <!-- SSH Brute Force Successful — Failed logins followed by success -->
+  <rule id="100002" level="14" timeframe="300">
+    <if_matched_sid>100001</if_matched_sid>
+    <if_sid>5715</if_sid>
+    <same_source_ip />
+    <description>SOC: SSH Brute Force SUCCESS — $(srcip) gained access after multiple failures</description>
+    <mitre>
+      <id>T1110.001</id>
+      <id>T1078</id>
+    </mitre>
+    <group>authentication_failures,brute_force,initial_access,</group>
+  </rule>
+
+  <!-- Windows RDP Brute Force — 5 failed logins in 120 seconds -->
+  <rule id="100003" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>60122</if_matched_sid>
+    <description>SOC: RDP Brute Force Attack — $(srcip) — 5+ failed logins</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,</group>
+  </rule>
+
+  <!-- Web Login Brute Force — 10 failed attempts in 60 seconds -->
+  <rule id="100004" level="10" frequency="10" timeframe="60">
+    <if_matched_sid>31104</if_matched_sid>
+    <description>SOC: Web Application Brute Force — $(srcip) — 10+ failed attempts</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failures,brute_force,web,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- PRIVILEGE ESCALATION                                         -->
+  <!-- ============================================================ -->
+
+  <!-- Linux sudo abuse — Multiple sudo failures then success -->
+  <rule id="100010" level="12" timeframe="300">
+    <if_sid>5401</if_sid>
+    <match>COMMAND</match>
+    <description>SOC: Sudo Command Execution after Prior Failures — possible privilege escalation</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>privilege_escalation,sudo,</group>
+  </rule>
+
+  <!-- New root-equivalent user created -->
+  <rule id="100011" level="14">
+    <if_sid>5902</if_sid>
+    <field name="uid">0</field>
+    <description>SOC: New user created with UID 0 (root equivalent) — CRITICAL</description>
+    <mitre>
+      <id>T1136.001</id>
+      <id>T1098</id>
+    </mitre>
+    <group>privilege_escalation,persistence,</group>
+  </rule>
+
+  <!-- Windows: New admin group member -->
+  <rule id="100012" level="13">
+    <if_sid>60144</if_sid>
+    <field name="win.eventdata.targetUserName">\S+</field>
+    <description>SOC: User added to Administrators group — $(win.eventdata.targetUserName)</description>
+    <mitre>
+      <id>T1098</id>
+      <id>T1078.003</id>
+    </mitre>
+    <group>privilege_escalation,account_manipulation,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- LATERAL MOVEMENT                                             -->
+  <!-- ============================================================ -->
+
+  <!-- Brute force success followed by SSH to internal host -->
+  <rule id="100020" level="15" timeframe="600">
+    <if_matched_sid>100002</if_matched_sid>
+    <if_sid>5715</if_sid>
+    <description>SOC: LATERAL MOVEMENT — Attacker pivoting to new host after brute force success</description>
+    <mitre>
+      <id>T1021.004</id>
+      <id>T1078</id>
+    </mitre>
+    <group>lateral_movement,post_exploitation,</group>
+  </rule>
+
+  <!-- PSExec / SMB lateral movement -->
+  <rule id="100021" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.eventdata.commandLine">psexec|wmic|winrm</field>
+    <description>SOC: Remote Execution Tool Detected — possible lateral movement</description>
+    <mitre>
+      <id>T1021.002</id>
+      <id>T1047</id>
+    </mitre>
+    <group>lateral_movement,remote_execution,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- RANSOMWARE BEHAVIOR                                          -->
+  <!-- ============================================================ -->
+
+  <!-- Mass file modifications (FIM: 50+ changes in 60 seconds) -->
+  <rule id="100030" level="15" frequency="50" timeframe="60">
+    <if_matched_sid>550</if_matched_sid>
+    <description>SOC: RANSOMWARE SUSPECTED — 50+ file modifications in 60 seconds</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,data_impact,</group>
+  </rule>
+
+  <!-- Ransomware extension detection -->
+  <rule id="100031" level="14">
+    <if_sid>550</if_sid>
+    <field name="syscheck.path">\.(encrypted|locked|crypt|cerber|locky|wannacry|ryuk)$</field>
+    <description>SOC: RANSOMWARE FILE EXTENSION — $(syscheck.path)</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,data_impact,</group>
+  </rule>
+
+  <!-- Shadow copy deletion (Windows) -->
+  <rule id="100032" level="15">
+    <if_sid>60103</if_sid>
+    <field name="win.eventdata.commandLine">vssadmin.*delete.*shadows|wmic.*shadowcopy.*delete</field>
+    <description>SOC: Volume Shadow Copy Deletion — pre-ransomware indicator</description>
+    <mitre>
+      <id>T1490</id>
+    </mitre>
+    <group>ransomware,defense_evasion,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- DATA EXFILTRATION                                            -->
+  <!-- ============================================================ -->
+
+  <!-- Large outbound data transfer detected -->
+  <rule id="100040" level="12">
+    <if_sid>87700</if_sid>
+    <field name="data.bytes_sent">\d{8,}</field>
+    <description>SOC: Large Outbound Data Transfer — possible exfiltration ($(data.bytes_sent) bytes)</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>exfiltration,data_theft,</group>
+  </rule>
+
+  <!-- DNS tunneling — long DNS queries (Suricata) -->
+  <rule id="100041" level="11">
+    <if_sid>86601</if_sid>
+    <field name="data.alert.signature">SOC - Suspicious Long DNS Query</field>
+    <description>SOC: DNS Tunneling Suspected — long subdomain query detected</description>
+    <mitre>
+      <id>T1071.004</id>
+      <id>T1048.003</id>
+    </mitre>
+    <group>exfiltration,dns_tunneling,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- PERSISTENCE MECHANISMS                                       -->
+  <!-- ============================================================ -->
+
+  <!-- Cron job modification -->
+  <rule id="100050" level="10">
+    <if_sid>550</if_sid>
+    <field name="syscheck.path">/etc/cron|/var/spool/cron</field>
+    <description>SOC: Cron Job Modified — possible persistence mechanism at $(syscheck.path)</description>
+    <mitre>
+      <id>T1053.003</id>
+    </mitre>
+    <group>persistence,scheduled_task,</group>
+  </rule>
+
+  <!-- SSH authorized_keys modification -->
+  <rule id="100051" level="12">
+    <if_sid>550</if_sid>
+    <field name="syscheck.path">.ssh/authorized_keys</field>
+    <description>SOC: SSH Authorized Keys Modified — possible backdoor at $(syscheck.path)</description>
+    <mitre>
+      <id>T1098.004</id>
+    </mitre>
+    <group>persistence,account_manipulation,</group>
+  </rule>
+
+  <!-- Systemd service creation -->
+  <rule id="100052" level="11">
+    <if_sid>550</if_sid>
+    <field name="syscheck.path">/etc/systemd/system|/usr/lib/systemd/system</field>
+    <description>SOC: New Systemd Service Created — possible persistence at $(syscheck.path)</description>
+    <mitre>
+      <id>T1543.002</id>
+    </mitre>
+    <group>persistence,service_creation,</group>
+  </rule>
+
+  <!-- Windows: Registry Run key modification -->
+  <rule id="100053" level="11">
+    <if_sid>60103</if_sid>
+    <field name="win.eventdata.targetObject">CurrentVersion\\Run</field>
+    <description>SOC: Windows Run Key Modified — auto-start persistence</description>
+    <mitre>
+      <id>T1547.001</id>
+    </mitre>
+    <group>persistence,registry,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- DEFENSE EVASION                                              -->
+  <!-- ============================================================ -->
+
+  <!-- Log clearing detected -->
+  <rule id="100060" level="14">
+    <if_sid>60103</if_sid>
+    <field name="win.eventdata.commandLine">wevtutil.*cl|Clear-EventLog</field>
+    <description>SOC: Windows Event Log Cleared — evidence destruction attempt</description>
+    <mitre>
+      <id>T1070.001</id>
+    </mitre>
+    <group>defense_evasion,indicator_removal,</group>
+  </rule>
+
+  <!-- Linux audit log tampered -->
+  <rule id="100061" level="14">
+    <if_sid>550</if_sid>
+    <field name="syscheck.path">/var/log/auth.log|/var/log/syslog|/var/log/audit</field>
+    <field name="syscheck.event">deleted</field>
+    <description>SOC: Critical Log File Deleted — $(syscheck.path) — evidence destruction</description>
+    <mitre>
+      <id>T1070.002</id>
+    </mitre>
+    <group>defense_evasion,indicator_removal,</group>
+  </rule>
+
+  <!-- Firewall disabled -->
+  <rule id="100062" level="13">
+    <if_sid>60103</if_sid>
+    <field name="win.eventdata.commandLine">netsh.*firewall.*off|Set-NetFirewallProfile.*-Enabled.*False</field>
+    <description>SOC: Host Firewall Disabled — defense evasion</description>
+    <mitre>
+      <id>T1562.004</id>
+    </mitre>
+    <group>defense_evasion,firewall,</group>
+  </rule>
+
+  <!-- ============================================================ -->
+  <!-- C2 COMMUNICATION                                             -->
+  <!-- ============================================================ -->
+
+  <!-- Periodic beaconing pattern (Suricata) -->
+  <rule id="100070" level="12">
+    <if_sid>86601</if_sid>
+    <field name="data.alert.signature">SOC - HTTP POST to Suspicious Port</field>
+    <description>SOC: Possible C2 Beacon — outbound HTTP POST to unusual port</description>
+    <mitre>
+      <id>T1071.001</id>
+      <id>T1573</id>
+    </mitre>
+    <group>c2,command_and_control,</group>
+  </rule>
+
+  <!-- Tor usage detected -->
+  <rule id="100071" level="10">
+    <if_sid>86601</if_sid>
+    <field name="data.alert.signature">SOC - Tor DNS Lookup Detected</field>
+    <description>SOC: Tor Network Access — anonymization tool usage detected</description>
+    <mitre>
+      <id>T1090.003</id>
+    </mitre>
+    <group>c2,proxy,policy_violation,</group>
+  </rule>
+
+</group>

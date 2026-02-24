@@ -1,0 +1,170 @@
+{
+  "version": "1.1",
+  "type": "dashboard",
+  "attributes": {
+    "title": "SOC Operations Overview",
+    "description": "Real-time SOC metrics including alert volumes, MTTR, SLA compliance, and analyst workload",
+    "panelsJSON": [
+      {
+        "gridData": {"x": 0, "y": 0, "w": 12, "h": 4, "i": "1"},
+        "type": "metric",
+        "title": "Total Alerts (24h)",
+        "savedSearchId": "alerts-24h",
+        "config": {
+          "query": {"match_all": {}},
+          "timeRange": "24h",
+          "index": "wazuh-alerts-*",
+          "agg": "count"
+        }
+      },
+      {
+        "gridData": {"x": 12, "y": 0, "w": 12, "h": 4, "i": "2"},
+        "type": "metric",
+        "title": "Critical Alerts (24h)",
+        "config": {
+          "query": {"term": {"rule.level": {"value": "15"}}},
+          "timeRange": "24h",
+          "index": "wazuh-alerts-*",
+          "agg": "count"
+        }
+      },
+      {
+        "gridData": {"x": 24, "y": 0, "w": 12, "h": 4, "i": "3"},
+        "type": "metric",
+        "title": "Mean Time to Respond (MTTR)",
+        "config": {
+          "query": {"exists": {"field": "response_time_ms"}},
+          "timeRange": "7d",
+          "index": "soc-metrics-*",
+          "agg": "avg",
+          "field": "response_time_ms",
+          "format": "duration"
+        }
+      },
+      {
+        "gridData": {"x": 36, "y": 0, "w": 12, "h": 4, "i": "4"},
+        "type": "gauge",
+        "title": "SLA Compliance (%)",
+        "config": {
+          "index": "soc-metrics-*",
+          "agg": "avg",
+          "field": "sla_met",
+          "format": "percent",
+          "thresholds": [60, 80, 95]
+        }
+      },
+      {
+        "gridData": {"x": 0, "y": 4, "w": 24, "h": 10, "i": "5"},
+        "type": "line",
+        "title": "Alert Volume Trend (7d)",
+        "config": {
+          "index": "wazuh-alerts-*",
+          "timeRange": "7d",
+          "interval": "1h",
+          "splitBy": "rule.level",
+          "buckets": [
+            {"label": "Critical (12-15)", "filter": {"range": {"rule.level": {"gte": 12}}}},
+            {"label": "High (8-11)", "filter": {"range": {"rule.level": {"gte": 8, "lt": 12}}}},
+            {"label": "Medium (4-7)", "filter": {"range": {"rule.level": {"gte": 4, "lt": 8}}}},
+            {"label": "Low (1-3)", "filter": {"range": {"rule.level": {"lt": 4}}}}
+          ]
+        }
+      },
+      {
+        "gridData": {"x": 24, "y": 4, "w": 24, "h": 10, "i": "6"},
+        "type": "pie",
+        "title": "Alert Distribution by Category",
+        "config": {
+          "index": "wazuh-alerts-*",
+          "timeRange": "24h",
+          "agg": "terms",
+          "field": "rule.groups",
+          "size": 10
+        }
+      },
+      {
+        "gridData": {"x": 0, "y": 14, "w": 24, "h": 10, "i": "7"},
+        "type": "table",
+        "title": "Top 10 Triggered Rules (24h)",
+        "config": {
+          "index": "wazuh-alerts-*",
+          "timeRange": "24h",
+          "columns": ["rule.id", "rule.description", "rule.level", "count"],
+          "agg": "terms",
+          "field": "rule.id",
+          "size": 10,
+          "sortBy": "count",
+          "sortOrder": "desc"
+        }
+      },
+      {
+        "gridData": {"x": 24, "y": 14, "w": 24, "h": 10, "i": "8"},
+        "type": "table",
+        "title": "Top Attacking IPs (24h)",
+        "config": {
+          "index": "wazuh-alerts-*",
+          "timeRange": "24h",
+          "columns": ["data.srcip", "rule.description", "GeoLocation.country_name", "count"],
+          "agg": "terms",
+          "field": "data.srcip",
+          "size": 10,
+          "sortBy": "count",
+          "sortOrder": "desc"
+        }
+      },
+      {
+        "gridData": {"x": 0, "y": 24, "w": 16, "h": 8, "i": "9"},
+        "type": "bar",
+        "title": "Analyst Workload — Cases per Analyst",
+        "config": {
+          "index": "thehive-cases-*",
+          "timeRange": "7d",
+          "agg": "terms",
+          "field": "assignee",
+          "size": 10
+        }
+      },
+      {
+        "gridData": {"x": 16, "y": 24, "w": 16, "h": 8, "i": "10"},
+        "type": "metric",
+        "title": "Open Cases",
+        "config": {
+          "index": "thehive-cases-*",
+          "query": {"term": {"status": "Open"}},
+          "agg": "count"
+        }
+      },
+      {
+        "gridData": {"x": 32, "y": 24, "w": 16, "h": 8, "i": "11"},
+        "type": "metric",
+        "title": "Active Incidents",
+        "config": {
+          "index": "thehive-cases-*",
+          "query": {"bool": {"must": [{"term": {"status": "Open"}}, {"range": {"severity": {"gte": 3}}}]}},
+          "agg": "count"
+        }
+      },
+      {
+        "gridData": {"x": 0, "y": 32, "w": 48, "h": 8, "i": "12"},
+        "type": "map",
+        "title": "Attack Source Geography (24h)",
+        "config": {
+          "index": "wazuh-alerts-*",
+          "timeRange": "24h",
+          "geoField": "GeoLocation.location",
+          "agg": "geotile_grid",
+          "precision": 4
+        }
+      }
+    ],
+    "timeRestore": true,
+    "timeTo": "now",
+    "timeFrom": "now-24h",
+    "refreshInterval": {"pause": false, "value": 30000}
+  },
+  "references": [
+    {"name": "index-pattern:wazuh-alerts", "type": "index-pattern", "id": "wazuh-alerts-*"},
+    {"name": "index-pattern:soc-metrics", "type": "index-pattern", "id": "soc-metrics-*"},
+    {"name": "index-pattern:thehive-cases", "type": "index-pattern", "id": "thehive-cases-*"}
+  ]
+}

@@ -1,0 +1,453 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "panels": [
+        {
+            "title": "Total Alerts (24h)",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 0,
+                "y": 0
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "*",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [],
+                    "timeField": "timestamp"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 100
+                            },
+                            {
+                                "color": "red",
+                                "value": 500
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "title": "Critical Alerts",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 4,
+                "y": 0
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "rule.level:>=12",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [],
+                    "timeField": "timestamp"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "fixed",
+                        "fixedColor": "red"
+                    },
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "title": "MTTR (Minutes)",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 8,
+                "y": 0
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "*",
+                    "metrics": [
+                        {
+                            "type": "avg",
+                            "field": "response_time_minutes",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [],
+                    "timeField": "timestamp"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "m",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 15
+                            },
+                            {
+                                "color": "red",
+                                "value": 60
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "title": "SLA Compliance",
+            "type": "gauge",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 12,
+                "y": 0
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "*",
+                    "metrics": [
+                        {
+                            "type": "avg",
+                            "field": "sla_compliance_pct",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [],
+                    "timeField": "timestamp"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "min": 0,
+                    "max": 100,
+                    "unit": "percent",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 80
+                            },
+                            {
+                                "color": "green",
+                                "value": 95
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "title": "Open Cases by Severity",
+            "type": "piechart",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 16,
+                "y": 0
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "status:Open",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "terms",
+                            "field": "severity",
+                            "id": "2"
+                        }
+                    ],
+                    "timeField": "timestamp"
+                }
+            ]
+        },
+        {
+            "title": "Active Analysts",
+            "type": "stat",
+            "gridPos": {
+                "h": 4,
+                "w": 4,
+                "x": 20,
+                "y": 0
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "*",
+                    "metrics": [
+                        {
+                            "type": "cardinality",
+                            "field": "analyst",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [],
+                    "timeField": "timestamp"
+                }
+            ]
+        },
+        {
+            "title": "Alert Volume Trend (7d)",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 4
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "rule.level:>=12",
+                    "alias": "Critical",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "date_histogram",
+                            "field": "timestamp",
+                            "id": "2",
+                            "settings": {
+                                "interval": "1h"
+                            }
+                        }
+                    ],
+                    "timeField": "timestamp"
+                },
+                {
+                    "query": "rule.level:[8 TO 11]",
+                    "alias": "High",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "date_histogram",
+                            "field": "timestamp",
+                            "id": "2",
+                            "settings": {
+                                "interval": "1h"
+                            }
+                        }
+                    ],
+                    "timeField": "timestamp"
+                },
+                {
+                    "query": "rule.level:[4 TO 7]",
+                    "alias": "Medium",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "date_histogram",
+                            "field": "timestamp",
+                            "id": "2",
+                            "settings": {
+                                "interval": "1h"
+                            }
+                        }
+                    ],
+                    "timeField": "timestamp"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "fillOpacity": 20,
+                        "lineWidth": 2
+                    }
+                }
+            }
+        },
+        {
+            "title": "Top 10 Rules Triggered",
+            "type": "table",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 4
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "*",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "terms",
+                            "field": "rule.description.keyword",
+                            "id": "2",
+                            "settings": {
+                                "size": "10",
+                                "order": "desc",
+                                "orderBy": "1"
+                            }
+                        }
+                    ],
+                    "timeField": "timestamp"
+                }
+            ]
+        },
+        {
+            "title": "MITRE ATT&CK Coverage",
+            "type": "barchart",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 12
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "rule.mitre.technique:*",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "terms",
+                            "field": "rule.mitre.tactic.keyword",
+                            "id": "2",
+                            "settings": {
+                                "size": "15"
+                            }
+                        }
+                    ],
+                    "timeField": "timestamp"
+                }
+            ]
+        },
+        {
+            "title": "Cases per Analyst (7d)",
+            "type": "barchart",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 12
+            },
+            "datasource": "OpenSearch",
+            "targets": [
+                {
+                    "query": "*",
+                    "metrics": [
+                        {
+                            "type": "count",
+                            "id": "1"
+                        }
+                    ],
+                    "bucketAggs": [
+                        {
+                            "type": "terms",
+                            "field": "assignee.keyword",
+                            "id": "2",
+                            "settings": {
+                                "size": "10"
+                            }
+                        }
+                    ],
+                    "timeField": "timestamp"
+                }
+            ]
+        }
+    ],
+    "schemaVersion": 39,
+    "tags": [
+        "soc",
+        "security",
+        "operations"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-24h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "SOC Operations Dashboard",
+    "uid": "soc-ops-dashboard",
+    "version": 1,
+    "refresh": "30s"
+}
