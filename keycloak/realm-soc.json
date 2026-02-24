@@ -1,0 +1,244 @@
+{
+  "realm": "soc-platform",
+  "enabled": true,
+  "displayName": "SOC Platform",
+  "displayNameHtml": "<strong>🛡 SOC Platform</strong>",
+  "loginTheme": "keycloak",
+  "sslRequired": "all",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "maxFailureWaitSeconds": 300,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "permanentLockout": false,
+
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername(undefined) and passwordHistory(3)",
+
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA256",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyLookAheadWindow": 1,
+
+  "ssoSessionIdleTimeout": 900,
+  "ssoSessionMaxLifespan": 28800,
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 300,
+  "offlineSessionIdleTimeout": 2592000,
+
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 10
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 20
+    }
+  ],
+
+  "roles": {
+    "realm": [
+      {
+        "name": "soc-admin",
+        "description": "Full platform administrator — unrestricted access to all services",
+        "composite": false
+      },
+      {
+        "name": "soc-lead",
+        "description": "SOC team lead — manage cases, edit IOCs, run scans, edit workflows",
+        "composite": false
+      },
+      {
+        "name": "soc-analyst",
+        "description": "SOC analyst — create/update cases, view IOCs, read alerts, run workflows",
+        "composite": false
+      },
+      {
+        "name": "threat-hunter",
+        "description": "Threat hunter — full IOC access, advanced queries, run scans",
+        "composite": false
+      },
+      {
+        "name": "soc-readonly",
+        "description": "Read-only observer — view-only access across all services",
+        "composite": false
+      }
+    ]
+  },
+
+  "defaultRoles": ["soc-readonly"],
+
+  "clients": [
+    {
+      "clientId": "thehive",
+      "name": "TheHive Case Management",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_THEHIVE_SECRET}",
+      "redirectUris": [
+        "https://thehive.soc.local/*"
+      ],
+      "webOrigins": [
+        "https://thehive.soc.local"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "misp",
+      "name": "MISP Threat Intelligence",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_MISP_SECRET}",
+      "redirectUris": [
+        "https://misp.soc.local/*"
+      ],
+      "webOrigins": [
+        "https://misp.soc.local"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "wazuh-dashboard",
+      "name": "Wazuh Dashboard",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_WAZUH_SECRET}",
+      "redirectUris": [
+        "https://wazuh.soc.local/*"
+      ],
+      "webOrigins": [
+        "https://wazuh.soc.local"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "cortex",
+      "name": "Cortex Analyzer Engine",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_CORTEX_SECRET}",
+      "redirectUris": [
+        "https://cortex.soc.local/*"
+      ],
+      "webOrigins": [
+        "https://cortex.soc.local"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "shuffle",
+      "name": "Shuffle SOAR",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${KEYCLOAK_SHUFFLE_SECRET}",
+      "redirectUris": [
+        "https://shuffle.soc.local/*"
+      ],
+      "webOrigins": [
+        "https://shuffle.soc.local"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true
+    }
+  ],
+
+  "users": [
+    {
+      "username": "soc-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@soc.local",
+      "firstName": "SOC",
+      "lastName": "Administrator",
+      "realmRoles": ["soc-admin"],
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KEYCLOAK_SOC_ADMIN_PASSWORD}",
+          "temporary": true
+        }
+      ]
+    }
+  ],
+
+  "eventsConfig": {
+    "eventsEnabled": true,
+    "eventsListeners": ["jboss-logging"],
+    "enabledEventTypes": [
+      "LOGIN", "LOGIN_ERROR", "LOGOUT", "LOGOUT_ERROR",
+      "REGISTER", "REGISTER_ERROR",
+      "UPDATE_PASSWORD", "UPDATE_PASSWORD_ERROR",
+      "UPDATE_TOTP", "REMOVE_TOTP",
+      "GRANT_CONSENT", "REVOKE_GRANT",
+      "CLIENT_LOGIN", "CLIENT_LOGIN_ERROR",
+      "IMPERSONATE",
+      "CUSTOM_REQUIRED_ACTION", "CUSTOM_REQUIRED_ACTION_ERROR"
+    ],
+    "adminEventsEnabled": true,
+    "adminEventsDetailsEnabled": true,
+    "eventsExpiration": 7776000
+  },
+
+  "internationalizationEnabled": false,
+  "supportedLocales": ["en"],
+  "defaultLocale": "en"
+}

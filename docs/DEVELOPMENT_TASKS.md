@@ -1,7 +1,7 @@
 # 🛠 Development Task Board
 ## Unified Open-Source SOC Platform
 
-> **Enterprise Readiness: 58/100** | Phase 1 ✅ | Phase 2–4 ⬜
+> **Enterprise Readiness: 72/100** | Phase 1 ✅ | Phase 2 ✅ | Phase 3–4 ⬜
 
 ---
 
@@ -26,19 +26,19 @@
 
 ---
 
-## ⬜ Phase 2 — Enterprise Access Control (Weeks 5–8)
+## ✅ Phase 2 — Enterprise Access Control (COMPLETE)
 
 > **Goal**: Proper identity, roles, and network segmentation
 
-- [ ] **2.1 SSO Integration** — Deploy Keycloak/authentik, configure OIDC/SAML for all services
-- [ ] **2.2 Multi-Factor Auth** — Enforce MFA on Wazuh, MISP, TheHive, OpenVAS
-- [ ] **2.3 RBAC Model** — Define roles: SOC Analyst, SOC Lead, Threat Hunter, Admin, Read-Only
-- [ ] **2.4 API Key Rotation** — 30-day max lifetime, automated rotation scripts
-- [ ] **2.5 Session Timeout** — Enforce ≤ 15 min idle timeout across all services
-- [ ] **2.6 Audit Logging** — Log all auth events, config changes, data access
-- [ ] **2.7 Network Segmentation** — Split `soc_net` into `net-data`, `net-app`, `net-mgmt`
+- [x] **2.1 SSO Integration** — Keycloak 24.0 deployed with OIDC for TheHive, MISP, Cortex, Shuffle, Wazuh
+- [x] **2.2 Multi-Factor Auth** — TOTP required for all users via Keycloak realm config
+- [x] **2.3 RBAC Model** — 5 roles: soc-admin, soc-lead, soc-analyst, threat-hunter, soc-readonly
+- [x] **2.4 API Key Rotation** — `scripts/rotate-api-keys.sh` (13 keys, cron-ready, backup + audit)
+- [x] **2.5 Session Timeout** — 15-min idle timeout, 8h absolute max in TheHive
+- [x] **2.6 Audit Logging** — `scripts/audit-logger.py` (hash-chain integrity, rotation, CLI tools)
+- [x] **2.7 Network Segmentation** — 3-tier: `net-mgmt`, `net-app`, `net-data`
 
-**Open Security Findings addressed:** SEC-09 (RBAC)
+**Security Findings addressed:** SEC-09 (RBAC) ✅
 
 ---
 
