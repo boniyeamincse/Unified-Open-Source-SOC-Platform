@@ -263,12 +263,20 @@ services:
     restart: always
     networks:
       - net-app
+      - net-data # Needs OpenSearch access
+    env_file:
+      - ./shuffle/.env.shuffle
     ports:
       - "127.0.0.1:3001:3001"
     mem_limit: 1g
     cpus: 1.0
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:3001/api/v1/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # ===========================================================
   # DATA TIER (net-data)
