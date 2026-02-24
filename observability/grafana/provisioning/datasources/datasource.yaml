@@ -1,0 +1,56 @@
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  File   : observability/grafana/provisioning/datasources/datasource.yaml
+#  Purpose: Auto-provision Prometheus as default Grafana datasource.
+####################################################################
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: "15s"
+    version: 1
+
+  - name: OpenSearch-Alerts
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: https://opensearch:9200
+    isDefault: false
+    editable: false
+    jsonData:
+      database: "wazuh-alerts-*"
+      flavor: opensearch
+      version: "2.11.0"
+      pplEnabled: true
+      tlsSkipVerify: true
+    secureJsonData:
+      basicAuthPassword: "${OPENSEARCH_INITIAL_ADMIN_PASSWORD}"
+    basicAuth: true
+    basicAuthUser: admin
+    version: 1
+
+  - name: OpenSearch-Suricata
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: https://opensearch:9200
+    isDefault: false
+    editable: false
+    jsonData:
+      database: "suricata-*"
+      flavor: opensearch
+      version: "2.11.0"
+      pplEnabled: true
+      tlsSkipVerify: true
+    secureJsonData:
+      basicAuthPassword: "${OPENSEARCH_INITIAL_ADMIN_PASSWORD}"
+    basicAuth: true
+    basicAuthUser: admin
+    version: 1

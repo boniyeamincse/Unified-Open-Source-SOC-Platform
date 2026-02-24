@@ -159,3 +159,48 @@ sudo bash deploy.sh logs wazuh.manager # Specific service
 - [ ] Set up MFA for admin accounts
 - [ ] Review Suricata rules for your environment
 - [ ] Schedule regular OpenVAS scans
+
+---
+
+## 📊 Observability Stack (Optional)
+
+Deploy Prometheus + Grafana for monitoring all SOC services:
+
+```bash
+# Start the observability overlay
+docker compose -f docker-compose.yml \
+  -f observability/docker-compose.observability.yml up -d
+
+# Access points:
+# Prometheus:  http://localhost:9090
+# Grafana:     http://localhost:3000  (admin / admin — change on first login)
+```
+
+Grafana auto-provisions Prometheus and OpenSearch datasources via
+`observability/grafana/provisioning/datasources/`.
+
+### Monitored Targets (12)
+Nginx, Keycloak, Wazuh, OpenSearch, TheHive, Cortex, MISP,
+Shuffle, PostgreSQL, Redis, Node Exporter, cAdvisor.
+
+### Alert Rules (15)
+High CPU, memory pressure, service down, disk > 90%, TLS expiry,
+and SOC-specific thresholds.
+
+---
+
+## ⏰ Automated Operations
+
+Install the example crontab for scheduled SOC tasks:
+
+```bash
+# Review first
+cat config/crontab.example
+
+# Install (as root)
+sudo crontab config/crontab.example
+```
+
+Includes: backups (02:00 daily), anomaly detection (15m), alert dedup (10m),
+risk scoring (hourly), compliance reports (weekly), OpenVAS feeds (04:00).
+

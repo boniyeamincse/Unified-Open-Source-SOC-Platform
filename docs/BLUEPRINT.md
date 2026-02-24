@@ -11,36 +11,35 @@
 
 This document outlines the architecture and integration strategy for the Unified Open-Source SOC Platform.
 
-## 🏗 Unified Architecture
-The platform is designed to run as a Docker SOC Cluster, integrating multiple specialized security tools into a single orchestration layer.
+## Architecture Overview
 
-```mermaid
-graph TD
-    subgraph Endpoints
-        WA[Wazuh Agents]
-    end
+This platform follows a **modular monolith** architecture orchestrated by Docker Compose,
+with services segmented across **three isolated networks**:
 
-    subgraph "Docker SOC Cluster"
-        WM[Wazuh Manager]
-        OS[OpenSearch]
-        S[Suricata]
-        M[MISP]
-        TH[TheHive]
-        C[Cortex]
-        OV[OpenVAS]
-        SH[Shuffle]
+| Tier | Network | Purpose | Services |
+|---|---|---|---|
+| **Management** | `net-mgmt` | Admin access, SSO, reverse proxy | Nginx, Keycloak |
+| **Application** | `net-app` | Case management, SOAR, analytics | TheHive, Cortex, MISP, Shuffle, OpenVAS |
+| **Data** | `net-data` | Storage, indexing, agents | Wazuh, OpenSearch, PostgreSQL, Redis, Suricata |
 
-        WA --> WM
-        S --> |EVE.json| WM
-        WM --> OS
-        M <--> WM
-        M <--> TH
-        TH <--> C
-        OV --> WM
-        SH <--> WM
-        SH <--> TH
-    end
-```
+### Service Roles
+
+| Component | Role | Network Tier |
+|---|---|---|
+| **Nginx** | TLS termination, reverse proxy, rate limiting, security headers | Management |
+| **Keycloak** | SSO (OIDC), MFA, 5-role RBAC, session management | Management |
+| **Wazuh Manager** | SIEM — log collection, FIM, vulnerability detection, agent management | Data |
+| **Suricata** | IDS/IPS — network traffic analysis, EVE JSON → Wazuh | Data |
+| **OpenSearch** | Search/analytics backend for Wazuh alerts and Suricata events | Data |
+| **MISP** | Threat intelligence sharing, IOC feeds, ZMQ publishing | Application |
+| **TheHive** | Case management, incident tracking, Cortex integration | Application |
+| **Cortex** | Observable analysis, 100+ analyzers, response actions | Application |
+| **OpenVAS** | Vulnerability scanning, NVT/SCAP/CERT feeds | Application |
+| **Shuffle** | SOAR automation — 20 playbooks, Wazuh/MISP/TheHive orchestration | Application |
+| **Redis** | Cache + message broker for MISP | Data |
+| **PostgreSQL** | Relational database for TheHive | Data |
+| **Prometheus** | Metrics collection — 12 scrape targets, 15 alert rules | Observability |
+| **Grafana** | Dashboards + visualization for all metrics and alerts | Observability |
 
 ## 🔵 Core SIEM + XDR: Wazuh
 - **Role:** Central Brain / Single-Pane-of-Glass.

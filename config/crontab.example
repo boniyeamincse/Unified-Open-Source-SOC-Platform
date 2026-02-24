@@ -1,0 +1,54 @@
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  File   : config/crontab.example
+#  Purpose: Example crontab entries for automated SOC operations.
+#           Install with: crontab config/crontab.example
+####################################################################
+
+# SOC Platform — Recommended Cron Schedule
+# Install: sudo crontab -u root config/crontab.example
+# Or append: cat config/crontab.example >> /var/spool/cron/crontabs/root
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SOC_HOME=/opt/soc-platform
+
+# ── Backups ──────────────────────────────────────────────
+# Full backup daily at 02:00
+0 2 * * * ${SOC_HOME}/scripts/backup-dr.sh backup >> /var/log/soc/backup.log 2>&1
+
+# ── Audit Log Processing ────────────────────────────────
+# Process and hash-chain audit logs every 5 minutes
+*/5 * * * * cd ${SOC_HOME} && python3 scripts/audit-logger.py --mode process >> /var/log/soc/audit.log 2>&1
+
+# Verify audit log integrity daily at 06:00
+0 6 * * * cd ${SOC_HOME} && python3 scripts/audit-logger.py --mode verify >> /var/log/soc/audit-verify.log 2>&1
+
+# ── Anomaly Detection ───────────────────────────────────
+# Run UEBA anomaly detection every 15 minutes
+*/15 * * * * cd ${SOC_HOME} && python3 scripts/anomaly-detector.py >> /var/log/soc/anomaly.log 2>&1
+
+# ── Alert Deduplication ─────────────────────────────────
+# Deduplicate and group alerts every 10 minutes
+*/10 * * * * cd ${SOC_HOME} && python3 scripts/alert-dedup.py >> /var/log/soc/dedup.log 2>&1
+
+# ── Risk Scoring ────────────────────────────────────────
+# Recalculate risk scores hourly
+0 * * * * cd ${SOC_HOME} && python3 scripts/risk-scoring.py >> /var/log/soc/risk.log 2>&1
+
+# ── Compliance Reports ──────────────────────────────────
+# Generate compliance report weekly (Sunday 03:00)
+0 3 * * 0 cd ${SOC_HOME} && python3 scripts/compliance-report.py --all >> /var/log/soc/compliance.log 2>&1
+
+# ── OpenVAS Feeds ───────────────────────────────────────
+# Sync vulnerability feeds daily at 04:00
+0 4 * * * docker exec openvas greenbone-feed-sync >> /var/log/soc/openvas-feed.log 2>&1
+
+# ── TLS Certificate Monitoring ──────────────────────────
+# Check cert expiry weekly (Monday 08:00)
+0 8 * * 1 find ${SOC_HOME}/nginx/certs -name "*.crt" -exec openssl x509 -enddate -noout -in {} \; >> /var/log/soc/cert-check.log 2>&1
+
+# ── Log Rotation ────────────────────────────────────────
+# Rotate SOC log files weekly
+0 0 * * 0 find /var/log/soc -name "*.log" -size +100M -exec gzip {} \; 2>&1
