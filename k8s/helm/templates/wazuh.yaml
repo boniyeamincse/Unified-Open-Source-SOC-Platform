@@ -1,0 +1,229 @@
+####################################################################
+#  SOC Platform — Wazuh Kubernetes Deployment
+####################################################################
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wazuh-manager
+  namespace: {{ .Values.namespaces.data }}
+  labels:
+    app: wazuh-manager
+spec:
+  serviceName: wazuh-manager
+  replicas: {{ .Values.wazuh.manager.replicas }}
+  selector:
+    matchLabels:
+      app: wazuh-manager
+  template:
+    metadata:
+      labels:
+        app: wazuh-manager
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: wazuh-manager
+          image: "{{ .Values.wazuh.manager.image }}:{{ .Values.wazuh.manager.tag }}"
+          resources:
+            {{- toYaml .Values.wazuh.manager.resources | nindent 12 }}
+          ports:
+            - containerPort: 1514
+              name: agent-tcp
+              protocol: TCP
+            - containerPort: 1514
+              name: agent-udp
+              protocol: UDP
+            - containerPort: 1515
+              name: registration
+            - containerPort: 55000
+              name: api
+          volumeMounts:
+            - name: wazuh-data
+              mountPath: /var/ossec/data
+            - name: wazuh-config
+              mountPath: /var/ossec/etc/ossec.conf
+              subPath: ossec.conf
+            - name: correlation-rules
+              mountPath: /var/ossec/etc/rules/soc-correlation.xml
+              subPath: soc-correlation.xml
+          livenessProbe:
+            exec:
+              command: ["/var/ossec/bin/wazuh-control", "status"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 55000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: wazuh-config
+          configMap:
+            name: wazuh-manager-config
+        - name: correlation-rules
+          configMap:
+            name: wazuh-correlation-rules
+  volumeClaimTemplates:
+    - metadata:
+        name: wazuh-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.global.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.wazuh.manager.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-manager
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1514
+      targetPort: 1514
+      name: agent-tcp
+      protocol: TCP
+    - port: 1514
+      targetPort: 1514
+      name: agent-udp
+      protocol: UDP
+    - port: 1515
+      targetPort: 1515
+      name: registration
+    - port: 55000
+      targetPort: 55000
+      name: api
+  selector:
+    app: wazuh-manager
+---
+# External access for Wazuh agents
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-agent-lb
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 1514
+      targetPort: 1514
+      name: agent
+      protocol: TCP
+  selector:
+    app: wazuh-manager
+---
+# ── Wazuh Indexer (OpenSearch) ───────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wazuh-indexer
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  serviceName: wazuh-indexer
+  replicas: {{ .Values.wazuh.indexer.replicas }}
+  selector:
+    matchLabels:
+      app: wazuh-indexer
+  template:
+    metadata:
+      labels:
+        app: wazuh-indexer
+    spec:
+      initContainers:
+        - name: sysctl
+          image: busybox:1.36
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+      containers:
+        - name: wazuh-indexer
+          image: "{{ .Values.wazuh.indexer.image }}:{{ .Values.wazuh.indexer.tag }}"
+          resources:
+            {{- toYaml .Values.wazuh.indexer.resources | nindent 12 }}
+          env:
+            - name: discovery.type
+              value: "single-node"
+            - name: OPENSEARCH_JAVA_OPTS
+              value: {{ .Values.wazuh.indexer.javaOpts | quote }}
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          volumeMounts:
+            - name: indexer-data
+              mountPath: /var/lib/wazuh-indexer
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 15
+  volumeClaimTemplates:
+    - metadata:
+        name: indexer-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.global.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.wazuh.indexer.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-indexer
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: http
+    - port: 9300
+      name: transport
+  selector:
+    app: wazuh-indexer
+---
+# ── Wazuh Dashboard ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wazuh-dashboard
+  namespace: {{ .Values.namespaces.application }}
+spec:
+  replicas: {{ .Values.wazuh.dashboard.replicas }}
+  selector:
+    matchLabels:
+      app: wazuh-dashboard
+  template:
+    metadata:
+      labels:
+        app: wazuh-dashboard
+    spec:
+      containers:
+        - name: wazuh-dashboard
+          image: "{{ .Values.wazuh.dashboard.image }}:{{ .Values.wazuh.dashboard.tag }}"
+          resources:
+            {{- toYaml .Values.wazuh.dashboard.resources | nindent 12 }}
+          ports:
+            - containerPort: 5601
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 5601
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-dashboard
+  namespace: {{ .Values.namespaces.application }}
+spec:
+  ports:
+    - port: 5601
+  selector:
+    app: wazuh-dashboard

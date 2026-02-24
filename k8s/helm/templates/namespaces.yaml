@@ -1,0 +1,80 @@
+####################################################################
+#  SOC Platform — Kubernetes Namespace Isolation
+#  3-tier namespace segmentation matching Docker network tiers
+####################################################################
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaces.management }}
+  labels:
+    app.kubernetes.io/part-of: soc-platform
+    tier: management
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaces.application }}
+  labels:
+    app.kubernetes.io/part-of: soc-platform
+    tier: application
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaces.data }}
+  labels:
+    app.kubernetes.io/part-of: soc-platform
+    tier: data
+---
+# ── Network Policies ────────────────────────────────────
+# Data tier: only accepts traffic from app tier
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-tier-isolation
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              tier: application
+        - namespaceSelector:
+            matchLabels:
+              tier: data
+---
+# App tier: accepts from mgmt and data
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-tier-isolation
+  namespace: {{ .Values.namespaces.application }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              tier: management
+        - namespaceSelector:
+            matchLabels:
+              tier: application
+---
+# Mgmt tier: accepts external traffic (ingress controller)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mgmt-tier-policy
+  namespace: {{ .Values.namespaces.management }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}  # Allow all — filtered by ingress controller

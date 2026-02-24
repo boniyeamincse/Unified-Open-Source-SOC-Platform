@@ -1,0 +1,118 @@
+####################################################################
+#  SOC Platform — Prometheus Configuration
+#  Scrapes all SOC services + infrastructure exporters
+####################################################################
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+# ── Alert Rules ──────────────────────────────────────────
+rule_files:
+  - "alerts/*.yml"
+
+# ── AlertManager ─────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+# ── Scrape Targets ───────────────────────────────────────
+scrape_configs:
+
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Node Exporter (host metrics)
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '(.+):.*'
+
+  # cAdvisor (container metrics)
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        target_label: service
+
+  # Wazuh API
+  - job_name: "wazuh-api"
+    metrics_path: /metrics
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    basic_auth:
+      username: wazuh-wui
+      password_file: /etc/prometheus/secrets/wazuh_password
+    static_configs:
+      - targets: ["wazuh-manager:55000"]
+
+  # OpenSearch / Wazuh Indexer
+  - job_name: "opensearch"
+    metrics_path: /_prometheus/metrics
+    static_configs:
+      - targets: ["wazuh-indexer:9200"]
+
+  # Keycloak metrics
+  - job_name: "keycloak"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["keycloak:9000"]
+
+  # Nginx (via stub_status)
+  - job_name: "nginx"
+    static_configs:
+      - targets: ["nginx-exporter:9113"]
+
+  # PostgreSQL
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  # TheHive (custom metrics endpoint)
+  - job_name: "thehive"
+    metrics_path: /api/status
+    static_configs:
+      - targets: ["thehive:9000"]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "thehive_.*"
+        action: keep
+
+  # Cortex
+  - job_name: "cortex"
+    metrics_path: /api/status
+    static_configs:
+      - targets: ["cortex:9001"]
+
+  # Suricata (via custom exporter)
+  - job_name: "suricata"
+    static_configs:
+      - targets: ["suricata-exporter:9917"]
+
+  # Blackbox probes (service availability)
+  - job_name: "blackbox-http"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://wazuh.soc.local
+          - https://misp.soc.local
+          - https://thehive.soc.local
+          - https://auth.soc.local
+          - https://cortex.soc.local
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

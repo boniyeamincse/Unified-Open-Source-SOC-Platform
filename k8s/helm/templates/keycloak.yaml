@@ -1,0 +1,108 @@
+####################################################################
+#  SOC Platform — Keycloak SSO Kubernetes Deployment
+####################################################################
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespaces.management }}
+  labels:
+    app: keycloak
+spec:
+  replicas: {{ .Values.keycloak.replicas }}
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: "{{ .Values.keycloak.image }}:{{ .Values.keycloak.tag }}"
+          args: ["start", "--import-realm"]
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          ports:
+            - containerPort: 8443
+              name: https
+            - containerPort: 9000
+              name: health
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: {{ .Values.keycloak.database.host }}
+            - name: KC_DB_URL_DATABASE
+              value: {{ .Values.keycloak.database.name }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.keycloak.database.user }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: keycloak-db-password
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: keycloak-admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: keycloak-admin-password
+            - name: KC_HOSTNAME
+              value: auth.{{ .Values.global.domain }}
+            - name: KC_PROXY
+              value: edge
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+          volumeMounts:
+            - name: realm-config
+              mountPath: /opt/keycloak/data/import/realm-soc.json
+              subPath: realm-soc.json
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 120
+            periodSeconds: 30
+      volumes:
+        - name: realm-config
+          configMap:
+            name: keycloak-realm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespaces.management }}
+spec:
+  ports:
+    - port: 8443
+      name: https
+  selector:
+    app: keycloak
+---
+# ── Pod Disruption Budget (HA) ──────────────────────────
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keycloak-pdb
+  namespace: {{ .Values.namespaces.management }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: keycloak

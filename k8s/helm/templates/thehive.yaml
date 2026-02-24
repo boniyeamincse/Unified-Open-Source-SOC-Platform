@@ -1,0 +1,97 @@
+####################################################################
+#  SOC Platform — TheHive + PostgreSQL Kubernetes Deployment
+####################################################################
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thehive
+  namespace: {{ .Values.namespaces.application }}
+  labels:
+    app: thehive
+spec:
+  replicas: {{ .Values.thehive.replicas }}
+  selector:
+    matchLabels:
+      app: thehive
+  template:
+    metadata:
+      labels:
+        app: thehive
+    spec:
+      containers:
+        - name: thehive
+          image: "{{ .Values.thehive.image }}:{{ .Values.thehive.tag }}"
+          resources:
+            {{- toYaml .Values.thehive.resources | nindent 12 }}
+          ports:
+            - containerPort: 9000
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: postgres-password
+            - name: THEHIVE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: thehive-secret
+            - name: CORTEX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: cortex-api-key
+            - name: KEYCLOAK_THEHIVE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: keycloak-thehive-secret
+          volumeMounts:
+            - name: thehive-data
+              mountPath: /opt/thp/thehive/data
+            - name: thehive-config
+              mountPath: /etc/thehive/application.conf
+              subPath: application.conf
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: thehive-data
+          persistentVolumeClaim:
+            claimName: thehive-data-pvc
+        - name: thehive-config
+          configMap:
+            name: thehive-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: thehive-data-pvc
+  namespace: {{ .Values.namespaces.application }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.thehive.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thehive
+  namespace: {{ .Values.namespaces.application }}
+spec:
+  ports:
+    - port: 9000
+  selector:
+    app: thehive

@@ -1,0 +1,137 @@
+####################################################################
+#  SOC Platform — AlertManager Configuration
+#  Routes alerts to Slack, email, and PagerDuty
+####################################################################
+
+# ── Alert Rules ──────────────────────────────────────────
+groups:
+  - name: soc-infrastructure
+    rules:
+
+      # ── Service Availability ───────────────────────────
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: soc
+        annotations:
+          summary: "{{ $labels.job }} is DOWN"
+          description: "{{ $labels.instance }} has been down for more than 2 minutes."
+
+      - alert: HighLatency
+        expr: probe_duration_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.instance }}"
+
+      # ── Resource Usage ─────────────────────────────────
+      - alert: HighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU > 85% on {{ $labels.instance }}"
+
+      - alert: CriticalCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU > 95% on {{ $labels.instance }}"
+
+      - alert: HighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory > 85% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk > 85% on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+      - alert: DiskSpaceCritical
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse"})) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk > 95% on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+      # ── Container Health ───────────────────────────────
+      - alert: ContainerRestarting
+        expr: rate(container_last_seen{name=~".+"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restart-looping"
+
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name=~".+"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} CPU > 80%"
+
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"} * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory > 85% of limit"
+
+      # ── OpenSearch ─────────────────────────────────────
+      - alert: OpenSearchClusterRed
+        expr: opensearch_cluster_health_status{color="red"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenSearch cluster health is RED"
+
+      - alert: OpenSearchClusterYellow
+        expr: opensearch_cluster_health_status{color="yellow"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OpenSearch cluster health is YELLOW"
+
+      # ── TLS Certificate Expiry ─────────────────────────
+      - alert: CertExpiringIn30Days
+        expr: probe_ssl_earliest_cert_expiry - time() < 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS cert for {{ $labels.instance }} expires in < 30 days"
+
+      - alert: CertExpiringIn7Days
+        expr: probe_ssl_earliest_cert_expiry - time() < 604800
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS cert for {{ $labels.instance }} expires in < 7 days"
+
+      # ── Backup Monitoring ──────────────────────────────
+      - alert: BackupStale
+        expr: time() - soc_last_backup_timestamp > 90000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No successful backup in over 25 hours"

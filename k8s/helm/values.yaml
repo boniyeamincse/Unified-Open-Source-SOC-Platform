@@ -1,0 +1,186 @@
+####################################################################
+#  Unified Open-Source SOC Platform — Helm Values
+#  Override these values for your environment
+####################################################################
+
+global:
+  domain: soc.local
+  storageClass: "standard"
+  tlsSecret: "soc-tls"
+  timezone: "UTC"
+
+# ═══════════════════════════════════════════════════════════
+# NAMESPACE CONFIGURATION
+# ═══════════════════════════════════════════════════════════
+namespaces:
+  management: soc-mgmt
+  application: soc-app
+  data: soc-data
+
+# ═══════════════════════════════════════════════════════════
+# WAZUH SIEM
+# ═══════════════════════════════════════════════════════════
+wazuh:
+  manager:
+    image: wazuh/wazuh-manager
+    tag: "4.7.2"
+    replicas: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    persistence:
+      size: "50Gi"
+    service:
+      agentPort: 1514
+      registrationPort: 1515
+      apiPort: 55000
+
+  indexer:
+    image: wazuh/wazuh-indexer
+    tag: "4.7.2"
+    replicas: 3
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    persistence:
+      size: "100Gi"
+    javaOpts: "-Xms1g -Xmx1g"
+
+  dashboard:
+    image: wazuh/wazuh-dashboard
+    tag: "4.7.2"
+    replicas: 1
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+# ═══════════════════════════════════════════════════════════
+# THEHIVE CASE MANAGEMENT
+# ═══════════════════════════════════════════════════════════
+thehive:
+  image: strangebee/thehive
+  tag: "5.2"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1500m"
+      memory: "2Gi"
+  persistence:
+    size: "20Gi"
+
+# ═══════════════════════════════════════════════════════════
+# CORTEX ANALYSIS ENGINE
+# ═══════════════════════════════════════════════════════════
+cortex:
+  image: thehiveproject/cortex
+  tag: "3.1.7"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1500m"
+      memory: "2Gi"
+  persistence:
+    size: "10Gi"
+
+# ═══════════════════════════════════════════════════════════
+# MISP THREAT INTEL
+# ═══════════════════════════════════════════════════════════
+misp:
+  image: coolacid/misp-docker
+  tag: "2.4.178"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1500m"
+      memory: "2Gi"
+  persistence:
+    size: "30Gi"
+
+# ═══════════════════════════════════════════════════════════
+# KEYCLOAK SSO
+# ═══════════════════════════════════════════════════════════
+keycloak:
+  image: quay.io/keycloak/keycloak
+  tag: "24.0"
+  replicas: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  database:
+    type: postgres
+    host: keycloak-postgresql
+    name: keycloak
+    user: keycloak
+
+# ═══════════════════════════════════════════════════════════
+# NGINX INGRESS
+# ═══════════════════════════════════════════════════════════
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "10"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1s"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    wazuh: "wazuh.soc.local"
+    misp: "misp.soc.local"
+    thehive: "thehive.soc.local"
+    cortex: "cortex.soc.local"
+    keycloak: "auth.soc.local"
+    openvas: "openvas.soc.local"
+    shuffle: "shuffle.soc.local"
+
+# ═══════════════════════════════════════════════════════════
+# POSTGRESQL (Bitnami subchart)
+# ═══════════════════════════════════════════════════════════
+postgresql:
+  enabled: true
+  auth:
+    existingSecret: "soc-postgres-secret"
+  primary:
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    persistence:
+      size: "20Gi"
+
+# ═══════════════════════════════════════════════════════════
+# OBSERVABILITY (deployed separately)
+# ═══════════════════════════════════════════════════════════
+observability:
+  prometheus:
+    scrapeInterval: 15s
+    retention: 30d
+  grafana:
+    adminPassword: ""  # Set via secret

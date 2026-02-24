@@ -1,0 +1,119 @@
+####################################################################
+#  SOC Platform — Observability Stack Docker Compose
+#  Overlay: docker compose -f docker-compose.yml -f observability/docker-compose.observability.yml up
+####################################################################
+version: "3.8"
+
+services:
+
+  # ── Prometheus ─────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: soc_prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alertmanager.yaml:/etc/prometheus/alerts/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=10GB"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    networks:
+      - net-mgmt
+
+  # ── AlertManager ───────────────────────────────────────
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: soc_alertmanager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - alertmanager-data:/alertmanager
+    networks:
+      - net-mgmt
+
+  # ── Grafana (Observability) ────────────────────────────
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: soc_grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-changeme}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_DISABLE_INITIAL_ADMIN_TOKEN: "true"
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: "Keycloak"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "grafana"
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid profile email"
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: "https://auth.soc.local/realms/soc-platform/protocol/openid-connect/auth"
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: "https://auth.soc.local/realms/soc-platform/protocol/openid-connect/token"
+      GF_SERVER_ROOT_URL: "https://grafana.soc.local"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./dashboards/grafana-soc.json:/etc/grafana/provisioning/dashboards/soc.json:ro
+    networks:
+      - net-mgmt
+
+  # ── Node Exporter (Host metrics) ──────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: soc_node_exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks:
+      - net-mgmt
+
+  # ── cAdvisor (Container metrics) ──────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: soc_cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - net-mgmt
+
+  # ── Blackbox Exporter (HTTP probes) ───────────────────
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: soc_blackbox
+    restart: unless-stopped
+    networks:
+      - net-mgmt
+      - net-app
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+
+
+networks:
+  net-mgmt:
+    external: true
+  net-app:
+    external: true

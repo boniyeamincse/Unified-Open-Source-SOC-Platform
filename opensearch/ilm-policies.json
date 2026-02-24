@@ -1,0 +1,344 @@
+{
+    "####################################################################": "SOC Platform — OpenSearch Index Lifecycle Management",
+    "author": "Boni Yeamin",
+    "purpose": "90-day hot, 365-day warm, 7-year cold archive",
+    "####################################################################_": "",
+    "policies": {
+        "soc-alerts-policy": {
+            "description": "ILM for Wazuh alert indices — high-performance hot tier, cost-optimized warm/cold",
+            "default_state": "hot",
+            "states": [
+                {
+                    "name": "hot",
+                    "actions": [
+                        {
+                            "rollover": {
+                                "min_index_age": "1d",
+                                "min_primary_shard_size": "25gb"
+                            }
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "warm",
+                            "conditions": {
+                                "min_index_age": "90d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "warm",
+                    "actions": [
+                        {
+                            "replica_count": {
+                                "number_of_replicas": 1
+                            }
+                        },
+                        {
+                            "force_merge": {
+                                "max_num_segments": 1
+                            }
+                        },
+                        {
+                            "read_only": {}
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "cold",
+                            "conditions": {
+                                "min_index_age": "365d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "cold",
+                    "actions": [
+                        {
+                            "replica_count": {
+                                "number_of_replicas": 0
+                            }
+                        },
+                        {
+                            "read_only": {}
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "delete",
+                            "conditions": {
+                                "min_index_age": "2555d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "delete",
+                    "actions": [
+                        {
+                            "notification": {
+                                "destination": "soc-alerts-channel",
+                                "message_template": {
+                                    "source": "Index {{ctx.index}} is being deleted after 7-year retention."
+                                }
+                            }
+                        },
+                        {
+                            "delete": {}
+                        }
+                    ]
+                }
+            ],
+            "ism_template": [
+                {
+                    "index_patterns": [
+                        "wazuh-alerts-*"
+                    ],
+                    "priority": 100
+                }
+            ]
+        },
+        "soc-archives-policy": {
+            "description": "ILM for Wazuh archive indices — extended cold retention",
+            "default_state": "hot",
+            "states": [
+                {
+                    "name": "hot",
+                    "actions": [
+                        {
+                            "rollover": {
+                                "min_index_age": "1d",
+                                "min_primary_shard_size": "50gb"
+                            }
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "warm",
+                            "conditions": {
+                                "min_index_age": "30d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "warm",
+                    "actions": [
+                        {
+                            "force_merge": {
+                                "max_num_segments": 1
+                            }
+                        },
+                        {
+                            "read_only": {}
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "cold",
+                            "conditions": {
+                                "min_index_age": "180d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "cold",
+                    "actions": [
+                        {
+                            "replica_count": {
+                                "number_of_replicas": 0
+                            }
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "delete",
+                            "conditions": {
+                                "min_index_age": "2555d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "delete",
+                    "actions": [
+                        {
+                            "delete": {}
+                        }
+                    ]
+                }
+            ],
+            "ism_template": [
+                {
+                    "index_patterns": [
+                        "wazuh-archives-*"
+                    ],
+                    "priority": 90
+                }
+            ]
+        },
+        "soc-audit-policy": {
+            "description": "ILM for audit logs — 7-year mandatory retention for compliance",
+            "default_state": "hot",
+            "states": [
+                {
+                    "name": "hot",
+                    "actions": [
+                        {
+                            "rollover": {
+                                "min_index_age": "7d",
+                                "min_primary_shard_size": "10gb"
+                            }
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "warm",
+                            "conditions": {
+                                "min_index_age": "90d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "warm",
+                    "actions": [
+                        {
+                            "force_merge": {
+                                "max_num_segments": 1
+                            }
+                        },
+                        {
+                            "read_only": {}
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "cold",
+                            "conditions": {
+                                "min_index_age": "365d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "cold",
+                    "actions": [
+                        {
+                            "replica_count": {
+                                "number_of_replicas": 0
+                            }
+                        },
+                        {
+                            "read_only": {}
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "delete",
+                            "conditions": {
+                                "min_index_age": "2555d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "delete",
+                    "actions": [
+                        {
+                            "notification": {
+                                "destination": "soc-alerts-channel",
+                                "message_template": {
+                                    "source": "⚠️ Audit index {{ctx.index}} deleted after 7-year retention."
+                                }
+                            }
+                        },
+                        {
+                            "delete": {}
+                        }
+                    ]
+                }
+            ],
+            "ism_template": [
+                {
+                    "index_patterns": [
+                        "soc-audit-*"
+                    ],
+                    "priority": 200
+                }
+            ]
+        },
+        "soc-suricata-policy": {
+            "description": "ILM for Suricata EVE logs — shorter retention",
+            "default_state": "hot",
+            "states": [
+                {
+                    "name": "hot",
+                    "actions": [
+                        {
+                            "rollover": {
+                                "min_index_age": "1d",
+                                "min_primary_shard_size": "30gb"
+                            }
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "warm",
+                            "conditions": {
+                                "min_index_age": "30d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "warm",
+                    "actions": [
+                        {
+                            "force_merge": {
+                                "max_num_segments": 1
+                            }
+                        },
+                        {
+                            "read_only": {}
+                        }
+                    ],
+                    "transitions": [
+                        {
+                            "state_name": "delete",
+                            "conditions": {
+                                "min_index_age": "180d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "delete",
+                    "actions": [
+                        {
+                            "delete": {}
+                        }
+                    ]
+                }
+            ],
+            "ism_template": [
+                {
+                    "index_patterns": [
+                        "suricata-*"
+                    ],
+                    "priority": 80
+                }
+            ]
+        }
+    },
+    "apply_instructions": {
+        "description": "Apply these policies via OpenSearch ISM API",
+        "commands": [
+            "curl -XPUT 'https://wazuh-indexer:9200/_plugins/_ism/policies/soc-alerts-policy' -H 'Content-Type: application/json' -d @opensearch/ilm-policies.json",
+            "# Policies auto-apply to matching index patterns via ism_template"
+        ]
+    }
+}

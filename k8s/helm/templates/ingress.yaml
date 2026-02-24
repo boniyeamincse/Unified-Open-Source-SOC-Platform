@@ -1,0 +1,92 @@
+####################################################################
+#  SOC Platform — Ingress Controller Configuration
+####################################################################
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: soc-ingress
+  namespace: {{ .Values.namespaces.management }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/server-snippets: |
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hosts.wazuh }}
+        - {{ .Values.ingress.hosts.misp }}
+        - {{ .Values.ingress.hosts.thehive }}
+        - {{ .Values.ingress.hosts.cortex }}
+        - {{ .Values.ingress.hosts.keycloak }}
+        - {{ .Values.ingress.hosts.openvas }}
+        - {{ .Values.ingress.hosts.shuffle }}
+      secretName: {{ .Values.global.tlsSecret }}
+  rules:
+    # Keycloak SSO
+    - host: {{ .Values.ingress.hosts.keycloak }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8443
+
+    # Wazuh Dashboard
+    - host: {{ .Values.ingress.hosts.wazuh }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wazuh-dashboard
+                port:
+                  number: 5601
+
+    # TheHive
+    - host: {{ .Values.ingress.hosts.thehive }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: thehive
+                port:
+                  number: 9000
+
+    # Cortex
+    - host: {{ .Values.ingress.hosts.cortex }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cortex
+                port:
+                  number: 9001
+
+    # MISP
+    - host: {{ .Values.ingress.hosts.misp }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: misp
+                port:
+                  number: 80
+{{- end }}

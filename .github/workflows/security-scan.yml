@@ -1,0 +1,104 @@
+####################################################################
+#  SOC Platform — Security Scan Pipeline
+#  Runs daily + on PRs: Trivy, secrets, compliance checks
+####################################################################
+name: Security Scan
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # Daily at 06:00 UTC
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+
+  # ── Full Trivy Scan ────────────────────────────────────
+  trivy-scan:
+    name: Trivy Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "MEDIUM,HIGH,CRITICAL"
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  # ── IaC Scanning ──────────────────────────────────────
+  iac-scan:
+    name: Infrastructure as Code Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "config"
+          scan-ref: "."
+          format: "table"
+          severity: "HIGH,CRITICAL"
+          exit-code: "0"
+
+  # ── Secrets Detection ─────────────────────────────────
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+      - name: Check for hardcoded credentials
+        run: |
+          echo "Checking for hardcoded credentials..."
+          PATTERNS=(
+            "password\s*=\s*['\"][^$]"
+            "api_key\s*=\s*['\"][^$]"
+            "secret\s*=\s*['\"][^$]"
+            "PRIVATE.KEY"
+          )
+          for pattern in "${PATTERNS[@]}"; do
+            if grep -rInE "$pattern" --include="*.py" --include="*.conf" --include="*.yaml" --include="*.yml" .; then
+              echo "⚠️ Potential hardcoded credential found: $pattern"
+            fi
+          done
+
+  # ── Compliance Check ───────────────────────────────────
+  compliance:
+    name: Compliance Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run compliance reporter
+        run: |
+          python3 scripts/compliance-report.py --all --output compliance-results.json
+          cat compliance-results.json
+
+      - name: Upload compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: compliance-results.json

@@ -1,0 +1,161 @@
+####################################################################
+#  SOC Platform — Wazuh Manager HA (Active-Passive)
+#  Uses shared PVC and leader election via sidecar
+####################################################################
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wazuh-manager-ha
+  namespace: soc-data
+  labels:
+    app: wazuh-manager
+    ha: "true"
+spec:
+  serviceName: wazuh-manager-ha
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wazuh-manager
+  template:
+    metadata:
+      labels:
+        app: wazuh-manager
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: wazuh-manager
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: wazuh-manager
+          image: wazuh/wazuh-manager:4.7.2
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          ports:
+            - containerPort: 1514
+              name: agent
+            - containerPort: 1515
+              name: registration
+            - containerPort: 55000
+              name: api
+          env:
+            - name: WAZUH_CLUSTER_ENABLED
+              value: "yes"
+            - name: WAZUH_CLUSTER_NODE_TYPE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: WAZUH_CLUSTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: soc-secrets
+                  key: wazuh-cluster-key
+            - name: WAZUH_CLUSTER_NODES
+              value: "wazuh-manager-ha-0.wazuh-manager-ha,wazuh-manager-ha-1.wazuh-manager-ha"
+          volumeMounts:
+            - name: wazuh-data
+              mountPath: /var/ossec/data
+            - name: wazuh-logs
+              mountPath: /var/ossec/logs
+            - name: shared-config
+              mountPath: /var/ossec/etc/shared
+          livenessProbe:
+            exec:
+              command: ["/var/ossec/bin/wazuh-control", "status"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 55000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: shared-config
+          persistentVolumeClaim:
+            claimName: wazuh-shared-config
+  volumeClaimTemplates:
+    - metadata:
+        name: wazuh-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 50Gi
+    - metadata:
+        name: wazuh-logs
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 30Gi
+---
+# Shared config PVC (ReadWriteMany for shared rules/decoders)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wazuh-shared-config
+  namespace: soc-data
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Headless service for StatefulSet DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-manager-ha
+  namespace: soc-data
+spec:
+  clusterIP: None
+  ports:
+    - port: 1514
+      name: agent
+    - port: 1515
+      name: registration
+    - port: 55000
+      name: api
+  selector:
+    app: wazuh-manager
+---
+# Active service (routes to master node)
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-manager-active
+  namespace: soc-data
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 1514
+      targetPort: 1514
+      name: agent
+    - port: 55000
+      targetPort: 55000
+      name: api
+  selector:
+    app: wazuh-manager
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: wazuh-manager-pdb
+  namespace: soc-data
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: wazuh-manager

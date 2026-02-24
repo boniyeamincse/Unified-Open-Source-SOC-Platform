@@ -1,0 +1,281 @@
+####################################################################
+#  SOC Platform — OpenSearch 3-Node HA Cluster
+#  Dedicated roles: master, data, coordinator
+####################################################################
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-master
+  namespace: {{ .Values.namespaces.data }}
+  labels:
+    app: opensearch
+    role: master
+spec:
+  serviceName: opensearch-master
+  replicas: 3
+  selector:
+    matchLabels:
+      app: opensearch
+      role: master
+  template:
+    metadata:
+      labels:
+        app: opensearch
+        role: master
+    spec:
+      initContainers:
+        - name: sysctl
+          image: busybox:1.36
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: opensearch
+                  role: master
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: opensearch
+          image: "{{ .Values.wazuh.indexer.image }}:{{ .Values.wazuh.indexer.tag }}"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          env:
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: cluster.name
+              value: "soc-opensearch"
+            - name: node.roles
+              value: "cluster_manager"
+            - name: cluster.initial_cluster_manager_nodes
+              value: "opensearch-master-0,opensearch-master-1,opensearch-master-2"
+            - name: discovery.seed_hosts
+              value: "opensearch-master-headless"
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xms1g -Xmx1g"
+            - name: DISABLE_INSTALL_DEMO_CONFIG
+              value: "true"
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health?local=true
+              port: 9200
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health?local=true
+              port: 9200
+            initialDelaySeconds: 90
+            periodSeconds: 30
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.global.storageClass }}
+        resources:
+          requests:
+            storage: "20Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-master-headless
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: http
+    - port: 9300
+      name: transport
+  selector:
+    app: opensearch
+    role: master
+---
+# ── Data Nodes ───────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-data
+  namespace: {{ .Values.namespaces.data }}
+  labels:
+    app: opensearch
+    role: data
+spec:
+  serviceName: opensearch-data
+  replicas: 3
+  selector:
+    matchLabels:
+      app: opensearch
+      role: data
+  template:
+    metadata:
+      labels:
+        app: opensearch
+        role: data
+    spec:
+      initContainers:
+        - name: sysctl
+          image: busybox:1.36
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: opensearch
+                    role: data
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: opensearch
+          image: "{{ .Values.wazuh.indexer.image }}:{{ .Values.wazuh.indexer.tag }}"
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "4Gi"
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+          env:
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: cluster.name
+              value: "soc-opensearch"
+            - name: node.roles
+              value: "data,ingest"
+            - name: discovery.seed_hosts
+              value: "opensearch-master-headless"
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xms2g -Xmx2g"
+            - name: DISABLE_INSTALL_DEMO_CONFIG
+              value: "true"
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health?local=true
+              port: 9200
+            initialDelaySeconds: 60
+            periodSeconds: 15
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.global.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.wazuh.indexer.persistence.size }}
+---
+# ── Coordinator (query) Node ─────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensearch-coordinator
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: opensearch
+      role: coordinator
+  template:
+    metadata:
+      labels:
+        app: opensearch
+        role: coordinator
+    spec:
+      containers:
+        - name: opensearch
+          image: "{{ .Values.wazuh.indexer.image }}:{{ .Values.wazuh.indexer.tag }}"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          env:
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: cluster.name
+              value: "soc-opensearch"
+            - name: node.roles
+              value: ""
+            - name: discovery.seed_hosts
+              value: "opensearch-master-headless"
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          ports:
+            - containerPort: 9200
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  ports:
+    - port: 9200
+      name: http
+  selector:
+    app: opensearch
+    role: coordinator
+---
+# ── PDB for cluster stability ───────────────────────────
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensearch-master-pdb
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: opensearch
+      role: master
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opensearch-data-pdb
+  namespace: {{ .Values.namespaces.data }}
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: opensearch
+      role: data
