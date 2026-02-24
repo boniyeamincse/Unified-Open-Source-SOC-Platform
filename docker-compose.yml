@@ -280,6 +280,9 @@ services:
       - net-data
     volumes:
       - wazuh_data:/var/ossec/data
+      - ./wazuh/ossec.conf:/var/ossec/etc/ossec.conf:ro
+      - ./wazuh/rules/soc-correlation.xml:/var/ossec/etc/rules/soc-correlation.xml:ro
+      - ./wazuh/wazuh-misp-integration.py:/var/ossec/integrations/custom-misp.py:ro
       - audit_logs:/var/log/soc
     ports:
       - "1514:1514/udp"
