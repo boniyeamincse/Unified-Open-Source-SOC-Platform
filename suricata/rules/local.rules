@@ -1,0 +1,41 @@
+# =============================================================
+# Suricata Local Rules
+# SOC Platform - Custom Detection Rules
+# =============================================================
+
+# -----------------------------------------
+# SCANNING & RECON
+# -----------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SOC - Nmap SYN Scan Detected"; flags:S; threshold: type both, track by_src, count 20, seconds 5; classtype:recon; sid:9000001; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 23 (msg:"SOC - Telnet Access Attempt"; sid:9000002; rev:1;)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 (msg:"SOC - SSH Brute Force Attempt"; flags:S; threshold: type both, track by_src, count 10, seconds 60; classtype:attempted-admin; sid:9000003; rev:1;)
+
+# -----------------------------------------
+# MALWARE / C2 INDICATORS
+# -----------------------------------------
+alert dns $HOME_NET any -> any any (msg:"SOC - Suspicious Long DNS Query (Possible Exfiltration)"; dns.query; pcre:"/[a-z0-9]{50,}/i"; classtype:trojan-activity; sid:9000010; rev:1;)
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"SOC - HTTP POST to Suspicious Port"; flow:to_server,established; http.method; content:"POST"; http.uri; classtype:trojan-activity; sid:9000011; rev:1;)
+
+# -----------------------------------------
+# WEB ATTACKS
+# -----------------------------------------
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"SOC - SQL Injection Attempt"; http.uri; content:"' OR '1'='1"; nocase; classtype:web-application-attack; sid:9000020; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"SOC - XSS Attempt Detected"; http.uri; content:"<script>"; nocase; classtype:web-application-attack; sid:9000021; rev:1;)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"SOC - Path Traversal Attempt"; http.uri; content:"../../"; classtype:web-application-attack; sid:9000022; rev:1;)
+
+# -----------------------------------------
+# POLICY VIOLATIONS
+# -----------------------------------------
+alert dns $HOME_NET any -> any any (msg:"SOC - Tor DNS Lookup Detected"; dns.query; content:".onion"; classtype:policy-violation; sid:9000030; rev:1;)
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"SOC - Cryptocurrency Mining Pool Access"; http.host; pcre:"/(pool\.supportxmr|minexmr|xmrpool)/i"; classtype:policy-violation; sid:9000031; rev:1;)
+
+# -----------------------------------------
+# LATERAL MOVEMENT
+# -----------------------------------------
+alert smb $HOME_NET any -> $HOME_NET any (msg:"SOC - SMB Lateral Movement Attempt"; classtype:attempted-admin; sid:9000040; rev:1;)
+alert tcp $HOME_NET any -> $HOME_NET 135 (msg:"SOC - RPC DCOM Lateral Movement Attempt"; flags:S; classtype:attempted-admin; sid:9000041; rev:1;)
+
+# -----------------------------------------
+# DATA EXFILTRATION
+# -----------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"SOC - Potential Large Data Upload"; flow:to_server,established; http.method; content:"POST"; http.content_len; byte_test:4,>,1048576,0; classtype:policy-violation; sid:9000050; rev:1;)

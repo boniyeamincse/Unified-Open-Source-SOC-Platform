@@ -1,0 +1,36 @@
+# --- SOC Platform .gitignore ---
+
+# Environment files with secrets
+.env
+!.env.example
+
+# TLS certificates (generated locally)
+nginx/certs/*.key
+nginx/certs/*.crt
+nginx/certs/*.csr
+nginx/certs/*.srl
+
+# Docker volumes / data
+data/
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Docs build artifacts
+docs/files.zip
+docs/SOC_Platform_Documentation.docx

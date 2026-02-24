@@ -1,0 +1,396 @@
+version: '3.8'
+
+networks:
+  soc_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+volumes:
+  wazuh_data:
+  opensearch_data:
+  misp_data:
+  thehive_data:
+  cortex_data:
+  openvas_data:
+  shuffle_data:
+  nginx_certs:
+
+services:
+
+  # ─────────────────────────────────────────────────────────
+  # WAZUH MANAGER (SIEM + XDR Core)
+  # ─────────────────────────────────────────────────────────
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.7.2
+    container_name: wazuh-manager
+    hostname: wazuh-manager
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 655360
+        hard: 655360
+    ports:
+      - "1514:1514/udp"   # Agent communication
+      - "1515:1515"       # Agent enrollment
+      - "514:514/udp"     # Syslog
+      - "55000:55000"     # Wazuh API
+    environment:
+      - INDEXER_URL=https://opensearch:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=${OPENSEARCH_PASSWORD:-SecurePassword123!}
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+    volumes:
+      - wazuh_data:/var/ossec/data
+      - ./config/wazuh/ossec.conf:/var/ossec/etc/ossec.conf:ro
+      - ./config/wazuh/rules:/var/ossec/etc/rules:ro
+      - ./config/wazuh/decoders:/var/ossec/etc/decoders:ro
+      - ./logs/wazuh:/var/ossec/logs
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "/var/ossec/bin/wazuh-control", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────
+  # OPENSEARCH (Data Backend for Wazuh)
+  # ─────────────────────────────────────────────────────────
+  opensearch:
+    image: wazuh/wazuh-indexer:4.7.2
+    container_name: opensearch
+    hostname: opensearch
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-SecurePassword123!}
+    volumes:
+      - opensearch_data:/var/lib/wazuh-indexer
+      - ./config/opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.11
+
+  # ─────────────────────────────────────────────────────────
+  # WAZUH DASHBOARD (OpenSearch Dashboards)
+  # ─────────────────────────────────────────────────────────
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.7.2
+    container_name: wazuh-dashboard
+    hostname: wazuh-dashboard
+    restart: unless-stopped
+    depends_on:
+      - opensearch
+      - wazuh-manager
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=${OPENSEARCH_PASSWORD:-SecurePassword123!}
+      - WAZUH_API_URL=https://wazuh-manager
+      - DASHBOARD_USERNAME=kibanaserver
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-SecurePassword123!}
+    volumes:
+      - ./config/dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml:ro
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.12
+    expose:
+      - "5601"
+
+  # ─────────────────────────────────────────────────────────
+  # SURICATA (Network IDS/IPS)
+  # ─────────────────────────────────────────────────────────
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata
+    hostname: suricata
+    restart: unless-stopped
+    network_mode: host        # Must use host networking for packet capture
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    environment:
+      - SURICATA_OPTIONS=-i ${MONITOR_INTERFACE:-eth0}
+    volumes:
+      - ./config/suricata/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - ./config/suricata/rules:/var/lib/suricata/rules:ro
+      - ./logs/suricata:/var/log/suricata
+    command: ["-c", "/etc/suricata/suricata.yaml", "--pidfile", "/run/suricata.pid", "-i", "${MONITOR_INTERFACE:-eth0}", "--init-errors-fatal"]
+
+  # ─────────────────────────────────────────────────────────
+  # FILEBEAT (Ships Suricata logs to Wazuh)
+  # ─────────────────────────────────────────────────────────
+  filebeat:
+    image: elastic/filebeat:8.11.0
+    container_name: filebeat
+    hostname: filebeat
+    restart: unless-stopped
+    user: root
+    depends_on:
+      - wazuh-manager
+    volumes:
+      - ./config/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs/suricata:/var/log/suricata:ro
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.13
+    command: filebeat -e -strict.perms=false
+
+  # ─────────────────────────────────────────────────────────
+  # MISP (Threat Intelligence Platform)
+  # ─────────────────────────────────────────────────────────
+  misp-db:
+    image: mysql:8.0
+    container_name: misp-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-MISPpassword123!}
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=${MYSQL_MISP_PASSWORD:-MISPpassword123!}
+    volumes:
+      - ./data/misp-db:/var/lib/mysql
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.20
+
+  misp:
+    image: ghcr.io/misp/misp-docker/misp-core:latest
+    container_name: misp
+    hostname: misp
+    restart: unless-stopped
+    depends_on:
+      - misp-db
+    environment:
+      - MYSQL_HOST=misp-db
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=${MYSQL_MISP_PASSWORD:-MISPpassword123!}
+      - MISP_ADMIN_EMAIL=${MISP_ADMIN_EMAIL:-admin@soc.local}
+      - MISP_ADMIN_PASSPHRASE=${MISP_ADMIN_PASS:-MISPadmin123!}
+      - MISP_BASEURL=https://misp.soc.local
+      - TIMEZONE=UTC
+    volumes:
+      - misp_data:/var/www/MISP/app/files
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.21
+    expose:
+      - "80"
+      - "443"
+
+  # ─────────────────────────────────────────────────────────
+  # THEHIVE (Case Management + SOAR)
+  # ─────────────────────────────────────────────────────────
+  thehive-cassandra:
+    image: cassandra:4.1
+    container_name: thehive-cassandra
+    restart: unless-stopped
+    environment:
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=256m
+      - CASSANDRA_CLUSTER_NAME=thehive
+    volumes:
+      - ./data/cassandra:/var/lib/cassandra
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.30
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  thehive-elasticsearch:
+    image: elasticsearch:7.17.12
+    container_name: thehive-es
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - ./data/thehive-es:/usr/share/elasticsearch/data
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.31
+
+  thehive:
+    image: strangebee/thehive:5.2
+    container_name: thehive
+    hostname: thehive
+    restart: unless-stopped
+    depends_on:
+      - thehive-cassandra
+      - thehive-elasticsearch
+      - cortex
+    environment:
+      - JVM_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - ./config/thehive/application.conf:/etc/thehive/application.conf:ro
+      - thehive_data:/opt/thehive/data
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.32
+    expose:
+      - "9000"
+
+  # ─────────────────────────────────────────────────────────
+  # CORTEX (Automated Enrichment)
+  # ─────────────────────────────────────────────────────────
+  cortex-elasticsearch:
+    image: elasticsearch:7.17.12
+    container_name: cortex-es
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - ./data/cortex-es:/usr/share/elasticsearch/data
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.40
+
+  cortex:
+    image: thehiveproject/cortex:3.1.7
+    container_name: cortex
+    hostname: cortex
+    restart: unless-stopped
+    depends_on:
+      - cortex-elasticsearch
+    environment:
+      - job_directory=/opt/cortex/jobs
+    volumes:
+      - ./config/cortex/application.conf:/etc/cortex/application.conf:ro
+      - cortex_data:/opt/cortex/data
+      - /var/run/docker.sock:/var/run/docker.sock  # For analyzer containers
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.41
+    expose:
+      - "9001"
+
+  # ─────────────────────────────────────────────────────────
+  # OPENVAS / GREENBONE (Vulnerability Management)
+  # ─────────────────────────────────────────────────────────
+  openvas:
+    image: greenbone/community-edition:latest
+    container_name: openvas
+    hostname: openvas
+    restart: unless-stopped
+    volumes:
+      - openvas_data:/opt/greenbone/data
+      - ./logs/openvas:/var/log/gvm
+    environment:
+      - PASSWORD=${OPENVAS_PASSWORD:-OpenVASpass123!}
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.50
+    expose:
+      - "9392"
+
+  # ─────────────────────────────────────────────────────────
+  # SHUFFLE (SOAR Automation Engine)
+  # ─────────────────────────────────────────────────────────
+  shuffle-frontend:
+    image: ghcr.io/shuffle/shuffle-frontend:latest
+    container_name: shuffle-frontend
+    hostname: shuffle-frontend
+    restart: unless-stopped
+    environment:
+      - BACKEND_HOSTNAME=shuffle-backend
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.60
+    expose:
+      - "3001"
+
+  shuffle-backend:
+    image: ghcr.io/shuffle/shuffle-backend:latest
+    container_name: shuffle-backend
+    hostname: shuffle-backend
+    restart: unless-stopped
+    depends_on:
+      - shuffle-opensearch
+    environment:
+      - DATASTORE_EMULATOR_HOST=shuffle-database:8000
+      - OPENSEARCH_URL=http://shuffle-opensearch:9200
+      - ENVIRONMENT_NAME=production
+      - ORG_ID=default
+      - SHUFFLE_OPENSEARCH_USERNAME=admin
+      - SHUFFLE_OPENSEARCH_PASSWORD=${SHUFFLE_ES_PASSWORD:-ShufflePass123!}
+      - SHUFFLE_DEFAULT_USERNAME=${SHUFFLE_ADMIN_USER:-admin}
+      - SHUFFLE_DEFAULT_PASSWORD=${SHUFFLE_ADMIN_PASS:-ShuffleAdmin123!}
+      - SHUFFLE_DEFAULT_APIKEY=${SHUFFLE_API_KEY:-}
+    volumes:
+      - shuffle_data:/shuffle-database
+      - /var/run/docker.sock:/var/run/docker.sock  # For app containers
+      - ./config/shuffle/apps:/shuffle-apps
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.61
+    expose:
+      - "5001"
+
+  shuffle-opensearch:
+    image: opensearchproject/opensearch:2.10.0
+    container_name: shuffle-opensearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${SHUFFLE_ES_PASSWORD:-ShufflePass123!}
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - ./data/shuffle-opensearch:/usr/share/opensearch/data
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.62
+
+  # ─────────────────────────────────────────────────────────
+  # NGINX REVERSE PROXY (TLS Termination)
+  # ─────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    hostname: nginx
+    restart: unless-stopped
+    depends_on:
+      - wazuh-dashboard
+      - misp
+      - thehive
+      - cortex
+      - openvas
+      - shuffle-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_certs:/etc/nginx/certs
+      - ./config/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      soc_network:
+        ipv4_address: 172.20.0.2

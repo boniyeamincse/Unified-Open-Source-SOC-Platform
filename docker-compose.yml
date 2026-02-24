@@ -1,0 +1,150 @@
+version: "3.9"
+
+networks:
+  soc_net:
+    driver: bridge
+
+volumes:
+  wazuh_data:
+  opensearch_data:
+  misp_db:
+  thehive_data:
+  cortex_data:
+  openvas_data:
+  postgres_data:
+
+
+services:
+
+  # ---------------------------
+  # WAZUH SIEM
+  # ---------------------------
+  wazuh.manager:
+    image: wazuh/wazuh-manager:${WAZUH_VERSION}
+    container_name: wazuh.manager
+    restart: always
+    networks:
+      - soc_net
+    volumes:
+      - wazuh_data:/var/ossec/data
+    ports:
+      - "1514:1514/udp"
+      - "1515:1515"
+      - "55000:55000"
+
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:${WAZUH_VERSION}
+    container_name: wazuh.indexer
+    restart: always
+    networks:
+      - soc_net
+    volumes:
+      - opensearch_data:/var/lib/wazuh-indexer
+    environment:
+      - discovery.type=single-node
+
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:${WAZUH_VERSION}
+    container_name: wazuh.dashboard
+    restart: always
+    networks:
+      - soc_net
+    ports:
+      - "5601:5601"
+
+  # ---------------------------
+  # SURICATA IDS
+  # ---------------------------
+  suricata:
+    image: jasonish/suricata
+    container_name: suricata
+    restart: always
+    network_mode: host
+    volumes:
+      - ./suricata:/etc/suricata
+
+  # ---------------------------
+  # MISP Threat Intel
+  # ---------------------------
+  misp:
+    image: coolacid/misp-docker
+    container_name: misp
+    restart: always
+    networks:
+      - soc_net
+    ports:
+      - "8080:80"
+    environment:
+      - MYSQL_PASSWORD=${MISP_DB_PASSWORD}
+    volumes:
+      - misp_db:/var/lib/mysql
+
+  # ---------------------------
+  # POSTGRES (TheHive)
+  # ---------------------------
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    networks:
+      - soc_net
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # ---------------------------
+  # THEHIVE
+  # ---------------------------
+  thehive:
+    image: strangebee/thehive:5
+    container_name: thehive
+    restart: always
+    networks:
+      - soc_net
+    depends_on:
+      - postgres
+    ports:
+      - "9000:9000"
+    volumes:
+      - thehive_data:/opt/thp/thehive/data
+
+  # ---------------------------
+  # CORTEX
+  # ---------------------------
+  cortex:
+    image: thehiveproject/cortex:3
+    container_name: cortex
+    restart: always
+    networks:
+      - soc_net
+    ports:
+      - "9001:9001"
+    volumes:
+      - cortex_data:/opt/cortex/data
+
+  # ---------------------------
+  # OPENVAS (Greenbone)
+  # ---------------------------
+  openvas:
+    image: greenbone/community-edition
+    container_name: openvas
+    restart: always
+    networks:
+      - soc_net
+    ports:
+      - "9392:9392"
+    volumes:
+      - openvas_data:/data
+
+  # ---------------------------
+  # SHUFFLE (SOAR Automation)
+  # ---------------------------
+  shuffle:
+    image: frikky/shuffle:latest
+    container_name: shuffle
+    restart: always
+    networks:
+      - soc_net
+    ports:
+      - "3001:3001"
