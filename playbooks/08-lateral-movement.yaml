@@ -1,0 +1,40 @@
+####################################################################
+#  SOAR Playbook: 08 — Lateral Movement
+####################################################################
+name: "Lateral Movement"
+id: "PB-008"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Lateral Movement"]
+  techniques: ["T1021"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id_any: [100020, 100021]
+
+steps:
+  - id: 1
+    action: "isolate_source"
+    auto_execute: true
+  - id: 2
+    action: "map_accessed_hosts"
+    description: "Identify all hosts accessed by the compromised account"
+  - id: 3
+    action: "disable_account"
+    description: "Disable the compromised user account"
+  - id: 4
+    action: "scan_accessed_hosts"
+    description: "Run integrity checks on all accessed hosts"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+    params:
+      severity: 4
+      tags: ["lateral-movement", "compromised"]
+
+containment:
+  auto_contain: true
+  actions: ["isolate_source", "disable_account"]

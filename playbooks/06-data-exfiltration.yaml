@@ -1,0 +1,41 @@
+####################################################################
+#  SOAR Playbook: 06 — Data Exfiltration
+####################################################################
+name: "Data Exfiltration"
+id: "PB-006"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Exfiltration"]
+  techniques: ["T1048"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id: 100040
+
+steps:
+  - id: 1
+    action: "analyze_destination"
+    description: "Check destination IP reputation and country"
+  - id: 2
+    action: "block_destination"
+    auto_execute: true
+    condition: "step_1.result.reputation == 'malicious'"
+  - id: 3
+    action: "capture_traffic"
+    description: "Start packet capture for forensics"
+  - id: 4
+    action: "identify_data"
+    description: "Determine what data was transferred"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+    params:
+      severity: 3
+      tags: ["exfiltration", "data-loss"]
+
+containment:
+  auto_contain: true
+  actions: ["block_destination"]

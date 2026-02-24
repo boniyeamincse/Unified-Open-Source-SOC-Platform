@@ -1,0 +1,68 @@
+####################################################################
+#  SOAR Playbook: 02 — Phishing Email Reported
+####################################################################
+name: "Phishing Email"
+id: "PB-002"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Initial Access"]
+  techniques: ["T1566.001", "T1566.002"]
+
+trigger:
+  source: "email_report"
+  conditions:
+    - type: "user_report"
+    - tag: "phishing"
+
+steps:
+  - id: 1
+    action: "extract_iocs"
+    description: "Extract URLs, attachments, sender domain"
+    params:
+      extract: ["urls", "attachments", "headers", "sender"]
+
+  - id: 2
+    action: "enrich_ioc"
+    description: "Check extracted IOCs against MISP + VirusTotal"
+    target: "misp"
+
+  - id: 3
+    action: "block_sender"
+    description: "Block sender domain in email gateway"
+    auto_execute: true
+    condition: "step_2.result.malicious == true"
+
+  - id: 4
+    action: "search_mailboxes"
+    description: "Search for same email across all mailboxes"
+    params:
+      search_by: ["sender", "subject", "attachment_hash"]
+
+  - id: 5
+    action: "quarantine_emails"
+    description: "Remove matching emails from all mailboxes"
+    condition: "step_4.result.count > 0"
+
+  - id: 6
+    action: "create_case"
+    target: "thehive"
+    params:
+      title: "Phishing Campaign — ${sender_domain}"
+      severity: 2
+      tags: ["phishing", "email"]
+
+  - id: 7
+    action: "notify_users"
+    description: "Warn users who received the email"
+    params:
+      template: "phishing_warning"
+
+escalation:
+  auto_escalate_after_minutes: 60
+  escalate_to: "soc-analyst"
+
+containment:
+  auto_contain: true
+  actions: ["block_sender", "quarantine_emails"]

@@ -1,0 +1,62 @@
+####################################################################
+#  SOAR Playbook: 03 — SSH Brute Force
+####################################################################
+name: "SSH Brute Force"
+id: "PB-003"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Credential Access"]
+  techniques: ["T1110.001"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id: 100001
+    - rule_level: ">=10"
+
+steps:
+  - id: 1
+    action: "geolocate_ip"
+    description: "GeoIP lookup on source IP"
+    params:
+      field: "data.srcip"
+
+  - id: 2
+    action: "check_reputation"
+    description: "Check IP against threat intel feeds"
+    target: "misp"
+
+  - id: 3
+    action: "block_ip"
+    description: "Block source IP at firewall level"
+    target: "wazuh"
+    params:
+      action: "firewall-drop"
+      duration: 3600
+    auto_execute: true
+
+  - id: 4
+    action: "check_success"
+    description: "Check if any login succeeded from this IP"
+    params:
+      query: "srcip:${data.srcip} AND rule.id:5715"
+      timerange: "1h"
+
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+    condition: "step_4.result.count > 0"
+    params:
+      title: "SSH Brute Force SUCCESS — ${data.srcip}"
+      severity: 3
+      tags: ["brute-force", "ssh", "compromised"]
+
+escalation:
+  auto_escalate_after_minutes: 30
+  condition: "step_4.result.count > 0"
+
+containment:
+  auto_contain: true
+  actions: ["block_ip"]

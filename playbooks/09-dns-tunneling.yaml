@@ -1,0 +1,34 @@
+####################################################################
+#  SOAR Playbook: 09 — DNS Tunneling
+####################################################################
+name: "DNS Tunneling"
+id: "PB-009"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Command and Control", "Exfiltration"]
+  techniques: ["T1071.004", "T1048.003"]
+
+trigger:
+  source: "suricata"
+  conditions:
+    - rule_id: 100041
+
+steps:
+  - id: 1
+    action: "analyze_dns"
+    description: "Decode DNS query patterns"
+  - id: 2
+    action: "block_domain"
+    auto_execute: true
+  - id: 3
+    action: "identify_source"
+    description: "Identify the process generating DNS queries"
+  - id: 4
+    action: "create_case"
+    target: "thehive"
+
+containment:
+  auto_contain: true
+  actions: ["block_domain"]

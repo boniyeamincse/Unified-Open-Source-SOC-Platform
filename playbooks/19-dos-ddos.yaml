@@ -1,0 +1,40 @@
+####################################################################
+#  SOAR Playbook: 19 — DoS/DDoS Attack
+####################################################################
+name: "Denial of Service"
+id: "PB-019"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Impact"]
+  techniques: ["T1498", "T1499"]
+
+trigger:
+  source: "suricata"
+  conditions:
+    - type: "traffic_anomaly"
+    - threshold: "10x_baseline"
+
+steps:
+  - id: 1
+    action: "activate_rate_limiting"
+    auto_execute: true
+  - id: 2
+    action: "geoblock"
+    description: "Block traffic from non-business countries"
+    auto_execute: true
+  - id: 3
+    action: "enable_cdn"
+    description: "Activate CDN/scrubbing service"
+  - id: 4
+    action: "page_oncall"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+    params:
+      severity: 3
+
+containment:
+  auto_contain: true
+  actions: ["rate_limit", "geoblock"]

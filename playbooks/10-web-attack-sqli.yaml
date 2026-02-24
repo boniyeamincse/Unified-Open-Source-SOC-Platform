@@ -1,0 +1,35 @@
+####################################################################
+#  SOAR Playbook: 10 — SQL Injection
+####################################################################
+name: "SQL Injection Attack"
+id: "PB-010"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Initial Access"]
+  techniques: ["T1190"]
+
+trigger:
+  source: "suricata"
+  conditions:
+    - signature: "SOC - SQL Injection Attempt"
+
+steps:
+  - id: 1
+    action: "block_ip"
+    auto_execute: true
+  - id: 2
+    action: "check_success"
+    description: "Check if SQLi was successful (5xx errors, data leak)"
+  - id: 3
+    action: "add_waf_rule"
+    description: "Add blocking rule to WAF/ModSecurity"
+  - id: 4
+    action: "create_case"
+    target: "thehive"
+    condition: "step_2.result.successful == true"
+
+containment:
+  auto_contain: true
+  actions: ["block_ip", "add_waf_rule"]

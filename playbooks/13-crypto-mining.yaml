@@ -1,0 +1,36 @@
+####################################################################
+#  SOAR Playbook: 13 — Cryptocurrency Mining
+####################################################################
+name: "Cryptomining Detected"
+id: "PB-013"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Impact"]
+  techniques: ["T1496"]
+
+trigger:
+  source: "suricata"
+  conditions:
+    - signature: "SOC - Cryptocurrency Mining Pool Access"
+
+steps:
+  - id: 1
+    action: "identify_process"
+  - id: 2
+    action: "kill_process"
+    auto_execute: true
+  - id: 3
+    action: "block_pool"
+    auto_execute: true
+  - id: 4
+    action: "scan_host"
+    description: "Full malware scan — miner might be part of larger compromise"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+
+containment:
+  auto_contain: true
+  actions: ["kill_process", "block_pool"]

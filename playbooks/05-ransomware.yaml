@@ -1,0 +1,54 @@
+####################################################################
+#  SOAR Playbook: 05 — Ransomware Behavior
+####################################################################
+name: "Ransomware Behavior"
+id: "PB-005"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Impact"]
+  techniques: ["T1486", "T1490"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id_any: [100030, 100031, 100032]
+    - rule_level: ">=14"
+
+steps:
+  - id: 1
+    action: "isolate_host"
+    description: "IMMEDIATE network isolation"
+    auto_execute: true
+    priority: "emergency"
+  - id: 2
+    action: "snapshot_state"
+    description: "Capture running processes, network, and file system state"
+  - id: 3
+    action: "check_backups"
+    description: "Verify backup integrity and last successful backup"
+  - id: 4
+    action: "create_case"
+    target: "thehive"
+    params:
+      title: "RANSOMWARE ALERT — ${agent.name}"
+      severity: 4
+      tags: ["ransomware", "critical", "P1"]
+  - id: 5
+    action: "page_oncall"
+    description: "Page on-call security engineer"
+    params:
+      method: ["phone", "sms", "slack"]
+      require_ack: true
+
+escalation:
+  auto_escalate_after_minutes: 5
+  escalate_to: "soc-admin"
+  executive_notification: true
+
+containment:
+  auto_contain: true
+  actions: ["isolate_host", "disable_shares", "snapshot_volumes"]
+  rollback_after_hours: 0
+  require_approval_for_rollback: true

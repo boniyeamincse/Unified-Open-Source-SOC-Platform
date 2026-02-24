@@ -1,0 +1,36 @@
+####################################################################
+#  SOAR Playbook: 16 — Account Compromise
+####################################################################
+name: "Account Compromise"
+id: "PB-016"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Credential Access"]
+  techniques: ["T1078"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id: 100002
+
+steps:
+  - id: 1
+    action: "disable_account"
+    auto_execute: true
+  - id: 2
+    action: "revoke_sessions"
+    description: "Terminate all active sessions in Keycloak"
+  - id: 3
+    action: "audit_access"
+    description: "Review what the account accessed post-compromise"
+  - id: 4
+    action: "reset_credentials"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+
+containment:
+  auto_contain: true
+  actions: ["disable_account", "revoke_sessions"]

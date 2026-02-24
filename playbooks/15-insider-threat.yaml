@@ -1,0 +1,36 @@
+####################################################################
+#  SOAR Playbook: 15 — Insider Threat / Anomalous Behavior
+####################################################################
+name: "Insider Threat"
+id: "PB-015"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Collection", "Exfiltration"]
+  techniques: ["T1074", "T1048"]
+
+trigger:
+  source: "anomaly_detector"
+  conditions:
+    - anomaly_severity: ["High", "Critical"]
+
+steps:
+  - id: 1
+    action: "review_activity"
+    description: "Review user's 7-day activity timeline"
+  - id: 2
+    action: "check_data_access"
+    description: "Identify sensitive data accessed"
+  - id: 3
+    action: "create_case"
+    target: "thehive"
+    params:
+      tags: ["insider-threat", "ueba"]
+  - id: 4
+    action: "enable_monitoring"
+    description: "Enable enhanced monitoring for this user"
+
+containment:
+  auto_contain: false
+  actions: ["enhanced_monitoring"]

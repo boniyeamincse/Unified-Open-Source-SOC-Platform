@@ -1,0 +1,46 @@
+####################################################################
+#  SOAR Playbook: 20 — Log Tampering / Evidence Destruction
+####################################################################
+name: "Log Tampering"
+id: "PB-020"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Defense Evasion"]
+  techniques: ["T1070.001", "T1070.002"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id_any: [100060, 100061]
+    - rule_level: ">=14"
+
+steps:
+  - id: 1
+    action: "snapshot_logs"
+    description: "Immediately snapshot remaining log data"
+    auto_execute: true
+  - id: 2
+    action: "isolate_host"
+    auto_execute: true
+  - id: 3
+    action: "identify_actor"
+    description: "Determine who/what cleared the logs"
+  - id: 4
+    action: "check_backup_logs"
+    description: "Retrieve log copies from centralized SIEM"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+    params:
+      severity: 4
+      tags: ["log-tampering", "evidence-destruction", "P1"]
+
+escalation:
+  auto_escalate_after_minutes: 5
+  escalate_to: "soc-admin"
+
+containment:
+  auto_contain: true
+  actions: ["snapshot_logs", "isolate_host"]

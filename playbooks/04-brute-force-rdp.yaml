@@ -1,0 +1,39 @@
+####################################################################
+#  SOAR Playbook: 04 — RDP Brute Force
+####################################################################
+name: "RDP Brute Force"
+id: "PB-004"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Credential Access"]
+  techniques: ["T1110.001"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id: 100003
+
+steps:
+  - id: 1
+    action: "geolocate_ip"
+  - id: 2
+    action: "check_reputation"
+    target: "misp"
+  - id: 3
+    action: "block_ip"
+    auto_execute: true
+    params:
+      duration: 3600
+  - id: 4
+    action: "disable_rdp"
+    description: "Disable RDP if not business-critical"
+    condition: "asset.rdp_required == false"
+  - id: 5
+    action: "create_case"
+    target: "thehive"
+
+containment:
+  auto_contain: true
+  actions: ["block_ip"]

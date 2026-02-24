@@ -1,0 +1,41 @@
+####################################################################
+#  SOAR Playbook: 14 — C2 Beacon
+####################################################################
+name: "Command & Control Beacon"
+id: "PB-014"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P1
+mitre:
+  tactics: ["Command and Control"]
+  techniques: ["T1071.001", "T1573"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id: 100070
+
+steps:
+  - id: 1
+    action: "isolate_host"
+    auto_execute: true
+  - id: 2
+    action: "capture_traffic"
+  - id: 3
+    action: "reverse_engineer"
+    description: "Analyze beacon pattern (interval, jitter, protocol)"
+  - id: 4
+    action: "ioc_extraction"
+    description: "Extract C2 server IPs/domains"
+  - id: 5
+    action: "block_c2"
+    auto_execute: true
+  - id: 6
+    action: "create_case"
+    target: "thehive"
+    params:
+      severity: 4
+
+containment:
+  auto_contain: true
+  actions: ["isolate_host", "block_c2"]

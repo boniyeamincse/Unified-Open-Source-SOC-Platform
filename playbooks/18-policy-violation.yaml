@@ -1,0 +1,30 @@
+####################################################################
+#  SOAR Playbook: 18 — Policy Violation
+####################################################################
+name: "Policy Violation"
+id: "PB-018"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P3
+mitre:
+  tactics: ["Policy Violation"]
+  techniques: []
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_group: "policy_violation"
+
+steps:
+  - id: 1
+    action: "identify_user"
+  - id: 2
+    action: "document_violation"
+  - id: 3
+    action: "notify_manager"
+  - id: 4
+    action: "create_alert"
+    target: "thehive"
+
+containment:
+  auto_contain: false

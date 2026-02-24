@@ -1,0 +1,29 @@
+####################################################################
+#  SOAR Playbook: 12 — Tor / Anonymizer Usage
+####################################################################
+name: "Tor / Anonymizer Usage"
+id: "PB-012"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P3
+mitre:
+  tactics: ["Command and Control"]
+  techniques: ["T1090.003"]
+
+trigger:
+  source: "suricata"
+  conditions:
+    - rule_id: 100071
+
+steps:
+  - id: 1
+    action: "identify_user"
+  - id: 2
+    action: "check_policy"
+    description: "Is Tor usage authorized for this user/role?"
+  - id: 3
+    action: "create_alert"
+    condition: "step_2.result.authorized == false"
+
+containment:
+  auto_contain: false

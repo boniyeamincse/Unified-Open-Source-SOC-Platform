@@ -1,0 +1,32 @@
+####################################################################
+#  SOAR Playbook: 07 — Privilege Escalation
+####################################################################
+name: "Privilege Escalation"
+id: "PB-007"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P2
+mitre:
+  tactics: ["Privilege Escalation"]
+  techniques: ["T1548", "T1068"]
+
+trigger:
+  source: "wazuh"
+  conditions:
+    - rule_id_any: [100010, 100011, 100012]
+
+steps:
+  - id: 1
+    action: "verify_authorized"
+    description: "Check if privilege change was authorized via change management"
+  - id: 2
+    action: "review_user_activity"
+    description: "Review user's recent 24h activity for suspicious patterns"
+  - id: 3
+    action: "create_case"
+    target: "thehive"
+    condition: "step_1.result.authorized == false"
+
+containment:
+  auto_contain: false
+  actions: ["alert_soc"]

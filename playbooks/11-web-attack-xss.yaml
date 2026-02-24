@@ -1,0 +1,29 @@
+####################################################################
+#  SOAR Playbook: 11 — Cross-Site Scripting (XSS)
+####################################################################
+name: "Cross-Site Scripting (XSS)"
+id: "PB-011"
+version: "1.0"
+author: "Boni Yeamin"
+severity: P3
+mitre:
+  tactics: ["Initial Access"]
+  techniques: ["T1189"]
+
+trigger:
+  source: "suricata"
+  conditions:
+    - signature: "SOC - XSS Attempt Detected"
+
+steps:
+  - id: 1
+    action: "log_attempt"
+  - id: 2
+    action: "check_csp"
+    description: "Verify CSP headers are blocking execution"
+  - id: 3
+    action: "create_alert"
+    target: "thehive"
+
+containment:
+  auto_contain: false
