@@ -31,6 +31,7 @@ volumes:
   postgres_data:
   keycloak_db_data:
   audit_logs:
+  redis_data:
 
 
 services:
@@ -155,12 +156,16 @@ services:
     restart: always
     networks:
       - net-app
+      - net-data # Needs Redis access
     ports:
       - "127.0.0.1:8080:80"
     environment:
       - MYSQL_PASSWORD=${MISP_DB_PASSWORD}
     volumes:
       - misp_db:/var/lib/mysql
+    depends_on:
+      redis:
+        condition: service_healthy
     mem_limit: 2g
     cpus: 1.5
     security_opt:
@@ -358,6 +363,31 @@ services:
     cpus: 2.0
     security_opt:
       - no-new-privileges:true
+
+  # ---------------------------
+  # REDIS (MISP Cache + ZMQ)
+  # ---------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    networks:
+      - net-data
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    mem_limit: 512m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   # ---------------------------
   # POSTGRES (TheHive)
