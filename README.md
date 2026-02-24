@@ -1,3 +1,11 @@
+<!-- ================================================================
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : README.md
+  Purpose: Project overview, quick start guide, and architecture map.
+================================================================= -->
+
 # 🛡 Unified Open-Source SOC Platform
 
 A fully integrated, Docker-based Security Operations Center (SOC) built entirely on open-source tools.

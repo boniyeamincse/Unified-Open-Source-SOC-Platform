@@ -1,5 +1,19 @@
 %YAML 1.1
 ---
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : docs/suricata.yaml
+#  Purpose: Reference Suricata IDS/IPS configuration for documentation.
+#           See suricata/suricata.yaml for the production version.
+####################################################################
+#
+# Step 1: Suricata captures packets on the network interface (af-packet)
+# Step 2: Packets are inspected against detection rules
+# Step 3: Alert matches are logged in EVE JSON format
+# Step 4: Wazuh ingests EVE JSON for correlation and dashboarding
+#
 # ═══════════════════════════════════════════════════════════
 #  Suricata IDS/IPS Configuration
 #  Unified SOC Platform

@@ -1,3 +1,12 @@
+<!-- ================================================================
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : docs/INSTALL.md
+  Purpose: Step-by-step installation guide covering prerequisites,
+           deployment, post-deployment, and security hardening.
+================================================================= -->
+
 # 📖 Installation Guide — Unified SOC Platform
 
 ## Prerequisites

@@ -1,4 +1,11 @@
-# --- SOC Platform .gitignore ---
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : .gitignore
+#  Purpose: Prevents secrets, certificates, data volumes, and
+#           temporary files from being committed to Git.
+####################################################################
 
 # Environment files with secrets
 .env

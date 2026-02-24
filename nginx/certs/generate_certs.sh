@@ -1,7 +1,19 @@
 #!/bin/bash
-# =============================================================
-# TLS Certificate Generator — SOC Platform
-# Generates self-signed certs for all SOC services
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : nginx/certs/generate_certs.sh
+#  Purpose: Generates self-signed TLS certificates for all SOC
+#           services using a shared Root CA. Import ca.crt into
+#           your browser to trust all service certificates.
+####################################################################
+#
+# Usage:
+#   Step 1: cd nginx/certs/
+#   Step 2: bash generate_certs.sh
+#   Step 3: Import ca.crt into your browser/OS trust store
+#
 # =============================================================
 set -euo pipefail
 

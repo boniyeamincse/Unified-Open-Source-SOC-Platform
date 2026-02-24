@@ -1,3 +1,19 @@
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : suricata/rules/local.rules
+#  Purpose: Custom Suricata detection rules for the SOC platform.
+#           Covers: scanning, C2, web attacks, policy violations,
+#           lateral movement, and data exfiltration.
+####################################################################
+#
+# How it works:
+#   Step 1: Suricata loads these rules at startup
+#   Step 2: Network packets are matched against each rule
+#   Step 3: Matching traffic generates an alert in eve.json
+#   Step 4: Wazuh ingests eve.json and correlates with other logs
+#
 # =============================================================
 # Suricata Local Rules
 # SOC Platform - Custom Detection Rules

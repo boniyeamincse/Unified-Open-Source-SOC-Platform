@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 """
+####################################################################
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : docs/soc_response_playbook.py
+  Purpose: Automated incident response playbook triggered by Wazuh
+           webhooks. Enriches IOCs via MISP & Cortex, creates
+           TheHive cases, blocks malicious IPs, and sends alerts.
+####################################################################
+
+How it works:
+  Step 1: Wazuh sends a webhook alert (level >= 7)
+  Step 2: Script parses the alert and extracts IOCs
+  Step 3: IOCs are enriched via MISP and Cortex API
+  Step 4: A TheHive case is created with tasks
+  Step 5: Malicious IPs are blocked via Wazuh Active Response
+  Step 6: Notification is sent to Slack/Email
+
 ═══════════════════════════════════════════════════════════
  Shuffle SOAR Playbook — Wazuh Alert Response
  Unified SOC Platform

@@ -1,3 +1,13 @@
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : docker-compose.yml
+#  Purpose: Main Docker orchestration — spins up all SOC services
+#           inside an isolated network (soc_net).
+####################################################################
+
+# Step 1: Define the Compose file format version
 version: "3.9"
 
 networks:

@@ -1,4 +1,20 @@
 <?php
+/**
+ * ####################################################################
+ *  Unified Open-Source SOC Platform
+ *  Author : Boni Yeamin
+ *  Open Source V:1.0
+ *  File   : misp/config.php
+ *  Purpose: MISP Threat Intelligence Platform configuration.
+ *           Controls IOC feeds, ZeroMQ event publishing, Redis
+ *           caching, and correlation engine settings.
+ * ####################################################################
+ *
+ * Step 1: MISP reads this config at startup
+ * Step 2: ZeroMQ publishes events to Wazuh and other consumers
+ * Step 3: Redis caches IOCs for fast lookup
+ * Step 4: Correlation engine links related threat data
+ */
 // =============================================================================
 // MISP Configuration for Unified SOC Platform
 // =============================================================================

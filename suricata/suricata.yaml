@@ -1,6 +1,16 @@
 %YAML 1.1
 ---
 
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : suricata/suricata.yaml
+#  Purpose: Suricata IDS/IPS engine configuration. Outputs EVE JSON
+#           logs that are ingested by Wazuh for alert correlation.
+#           Covers network capture, protocol detection, and logging.
+####################################################################
+
 # =======================================================================
 # Suricata IDS/IPS Configuration
 # Integrated with Wazuh SOC Platform

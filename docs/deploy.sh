@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════════
-#  Unified SOC Platform — Deployment Script
-#  Automated setup for the full open-source SOC stack
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : docs/deploy.sh
+#  Purpose: Automated deployment script for the full SOC stack.
+#           Handles: deploy, stop, restart, health check, logs,
+#           and update commands for all Docker services.
+####################################################################
+#
+# Usage:
+#   Step 1: sudo bash deploy.sh deploy    — Full deployment
+#   Step 2: sudo bash deploy.sh health    — Check service status
+#   Step 3: sudo bash deploy.sh logs      — View live logs
+#
 # ═══════════════════════════════════════════════════════════
 
 set -euo pipefail

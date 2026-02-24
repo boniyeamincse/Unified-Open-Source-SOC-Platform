@@ -1,8 +1,19 @@
 #!/bin/bash
-# =============================================================
-# OpenVAS / Greenbone Community Edition Setup Script
-# SOC Platform – Vulnerability Management
-# =============================================================
+####################################################################
+#  Unified Open-Source SOC Platform
+#  Author : Boni Yeamin
+#  Open Source V:1.0
+#  File   : openvas/setup.sh
+#  Purpose: OpenVAS / Greenbone setup script. Syncs NVT, SCAP, and
+#           CERT vulnerability feeds, then verifies scanner status.
+####################################################################
+#
+# Usage:
+#   Step 1: bash openvas/setup.sh    (run after container is up)
+#   Step 2: Wait for feed sync to complete (~10-30 minutes)
+#   Step 3: Access OpenVAS at https://openvas.soc.local
+#
+# ========================================================================================
 set -euo pipefail
 
 echo "======================================================"

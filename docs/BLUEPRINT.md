@@ -1,3 +1,12 @@
+<!-- ================================================================
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : docs/BLUEPRINT.md
+  Purpose: SOC architecture blueprint with component overview,
+           integration strategy, and hardware requirements.
+================================================================= -->
+
 # 🛡 Unified Open-Source SOC Platform Blueprint
 
 This document outlines the architecture and integration strategy for the Unified Open-Source SOC Platform.

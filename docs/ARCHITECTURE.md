@@ -1,3 +1,12 @@
+<!-- ================================================================
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : docs/ARCHITECTURE.md
+  Purpose: Detailed architecture reference with integration maps,
+           data flows, port mapping, and Blue/Red team usage.
+================================================================= -->
+
 # 🏗 Architecture Reference — Unified SOC Platform
 
 ## Component Integration Map

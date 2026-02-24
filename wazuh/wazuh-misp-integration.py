@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 """
+####################################################################
+  Unified Open-Source SOC Platform
+  Author : Boni Yeamin
+  Open Source V:1.0
+  File   : wazuh/wazuh-misp-integration.py
+  Purpose: Syncs IOC feeds from MISP into Wazuh CDB lists for
+           real-time IOC matching. Also auto-generates Wazuh
+           custom rules for IP, domain, hash, and URL matching.
+####################################################################
+
+Usage:
+  Step 1: Export MISP_API_KEY=<your-api-key>
+  Step 2: python3 wazuh-misp-integration.py [days_back]
+  Step 3: Restart Wazuh Manager to load new CDB lists
+
 Wazuh ←→ MISP Integration Script
 Fetches IOCs from MISP and creates Wazuh CDB lists for real-time matching.
 """
