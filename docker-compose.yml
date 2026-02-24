@@ -224,6 +224,7 @@ services:
       - "127.0.0.1:9001:9001"
     volumes:
       - cortex_data:/opt/cortex/data
+      - ./cortex/application.conf:/etc/cortex/application.conf:ro
     environment:
       - CORTEX_SECRET=${CORTEX_SECRET}
     mem_limit: 2g

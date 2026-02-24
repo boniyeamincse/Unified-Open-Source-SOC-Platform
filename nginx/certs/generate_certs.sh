@@ -39,7 +39,7 @@ else
 fi
 
 # --- Generate service certificates ---
-services=("wazuh" "misp" "thehive" "cortex" "openvas" "shuffle")
+services=("wazuh" "misp" "thehive" "cortex" "openvas" "shuffle" "keycloak")
 
 for svc in "${services[@]}"; do
     if [[ -f "$CERT_DIR/${svc}.crt" ]]; then
