@@ -40,6 +40,8 @@ import logging
 import os
 from datetime import datetime
 from typing import Optional
+import hmac
+import hashlib
 
 # ── Logging ───────────────────────────────────────────────
 logging.basicConfig(
@@ -61,6 +63,8 @@ class Config:
     WAZUH_PASS      = os.getenv("WAZUH_PASS", "")
     VIRUSTOTAL_KEY  = os.getenv("VIRUSTOTAL_API_KEY", "")
     SLACK_WEBHOOK   = os.getenv("SLACK_WEBHOOK_URL", "")
+    WEBHOOK_SECRET  = os.getenv("WEBHOOK_HMAC_SECRET", "")  # SEC-05: HMAC auth
+    CA_BUNDLE       = os.getenv("REQUESTS_CA_BUNDLE", "/opt/soc/certs/ca.crt")
 
     # Thresholds
     BLOCK_THRESHOLD     = 9     # Alert level to auto-block IP
@@ -136,7 +140,7 @@ class ThreatIntel:
                 headers=self.misp_headers,
                 json={"value": ip, "type": "ip-src", "returnFormat": "json"},
                 timeout=10,
-                verify=False
+                verify=Config.CA_BUNDLE  # SEC-02 FIX: Validate TLS certs
             )
             data = resp.json()
             attrs = data.get("response", {}).get("Attribute", [])
@@ -286,7 +290,7 @@ class FirewallManager:
             resp = requests.get(
                 f"{Config.WAZUH_API_URL}/security/user/authenticate",
                 auth=(Config.WAZUH_USER, Config.WAZUH_PASS),
-                verify=False,
+                verify=Config.CA_BUNDLE,  # SEC-02 FIX
                 timeout=10
             )
             if resp.status_code == 200:
@@ -311,7 +315,7 @@ class FirewallManager:
                     "arguments": [ip],
                     "alert": {"data": {"srcip": ip}}
                 },
-                verify=False,
+                verify=Config.CA_BUNDLE,  # SEC-02 FIX
                 timeout=10
             )
             if resp.status_code == 200:
@@ -431,13 +435,40 @@ def run_webhook_server(host="0.0.0.0", port=9999):
     from http.server import HTTPServer, BaseHTTPRequestHandler
     import json
 
+    # SEC-05 FIX: HMAC Signature Verification
+    WEBHOOK_SECRET = Config.WEBHOOK_SECRET
+
     class WebhookHandler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
             logger.debug(f"HTTP: {format % args}")
 
+        def _verify_signature(self, body: bytes) -> bool:
+            """Verify HMAC-SHA256 signature from X-Webhook-Signature header."""
+            if not WEBHOOK_SECRET:
+                logger.warning("WEBHOOK_HMAC_SECRET not set — rejecting all requests")
+                return False
+            signature = self.headers.get("X-Webhook-Signature", "")
+            if not signature:
+                logger.warning("Missing X-Webhook-Signature header")
+                return False
+            expected = hmac.new(
+                WEBHOOK_SECRET.encode(), body, hashlib.sha256
+            ).hexdigest()
+            return hmac.compare_digest(f"sha256={expected}", signature)
+
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
+
+            # SEC-05: Verify HMAC signature before processing
+            if not self._verify_signature(body):
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"error":"unauthorized","detail":"invalid or missing signature"}')
+                logger.warning(f"Rejected webhook: invalid signature from {self.client_address[0]}")
+                return
+
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -445,7 +476,6 @@ def run_webhook_server(host="0.0.0.0", port=9999):
 
             try:
                 payload = json.loads(body)
-                # Run in background thread
                 import threading
                 t = threading.Thread(target=run_playbook, args=(payload,), daemon=True)
                 t.start()
@@ -453,6 +483,7 @@ def run_webhook_server(host="0.0.0.0", port=9999):
                 logger.error(f"Webhook parse error: {e}")
 
     logger.info(f"Starting SOC webhook receiver on {host}:{port}")
+    logger.info("HMAC signature verification: ENABLED")
     server = HTTPServer((host, port), WebhookHandler)
     server.serve_forever()
 

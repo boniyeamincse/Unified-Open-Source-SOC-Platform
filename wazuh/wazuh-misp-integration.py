@@ -36,6 +36,7 @@ logger = logging.getLogger("wazuh-misp-sync")
 MISP_URL     = os.getenv("MISP_URL", "http://misp:80")
 MISP_API_KEY = os.getenv("MISP_API_KEY", "")
 WAZUH_CDB_DIR = os.getenv("WAZUH_CDB_DIR", "/var/ossec/etc/lists")
+CA_BUNDLE    = os.getenv("REQUESTS_CA_BUNDLE", "/var/ossec/etc/certs/ca.crt")
 
 # IOC types to fetch
 IOC_TYPES = {
@@ -74,7 +75,7 @@ def fetch_iocs(days_back: int = 30) -> dict:
                     "limit": 10000
                 },
                 timeout=30,
-                verify=False
+                verify=CA_BUNDLE  # SEC-02 FIX: Validate TLS certificates
             )
 
             if resp.status_code == 200:

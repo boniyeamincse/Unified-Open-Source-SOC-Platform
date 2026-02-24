@@ -54,8 +54,8 @@ $config = array(
         'zmq_enabled' => true,
         'zmq_host' => '127.0.0.1',
         'zmq_port' => 50000,
-        'zmq_username' => '',
-        'zmq_password' => '',
+        'zmq_username' => 'misp_zmq',
+        'zmq_password' => getenv('MISP_ZMQ_PASSWORD') ?: '',
         'zmq_topic_prefix' => 'misp_json',
 
         // Sync
@@ -83,7 +83,7 @@ $config = array(
     'debug' => 0,
     'Security' => array(
         'salt' => '',  // Auto-generated
-        'cipherSeed' => '86977341',
+        'cipherSeed' => getenv('MISP_CIPHER_SEED') ?: bin2hex(random_bytes(16)),
         'allow_self_registration' => false,
         'password_policy_length' => 12,
         'password_policy_complexity' => '/^((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/',
@@ -91,12 +91,12 @@ $config = array(
 
     'Email' => array(
         'from' => getenv('MISP_ADMIN_EMAIL') ?: 'admin@admin.test',
-        'host' => 'localhost',
-        'port' => 25,
+        'host' => getenv('SMTP_HOST') ?: 'localhost',
+        'port' => intval(getenv('SMTP_PORT') ?: 587),
         'timeout' => 30,
-        'username' => '',
-        'password' => '',
-        'tls' => false,
+        'username' => getenv('SMTP_USER') ?: '',
+        'password' => getenv('SMTP_PASS') ?: '',
+        'tls' => true,
         'ssl' => false,
     ),
 
